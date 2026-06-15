@@ -161,7 +161,7 @@ export default function Home() {
           </div>
 
           {/* Flow */}
-          <div style={{ display: 'flex', gap: '0', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexWrap: 'wrap', gap: '8px' }}>
             {[
               { step: '1', label: 'Найти', emoji: '🔍', desc: 'Каталог возможностей с фильтрами' },
               { step: '→', label: '', emoji: '', desc: '' },
