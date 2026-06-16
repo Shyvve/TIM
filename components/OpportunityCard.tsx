@@ -49,7 +49,7 @@ export default function OpportunityCard({ opportunity: opp }: Props) {
     <Link href={`/opportunities/${opp.id}`} style={{ textDecoration: 'none' }}>
       <div className="card" style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
         {/* Top */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '16px', gap: '12px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', gap: '12px' }}>
           <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
             <span className={`badge ${CATEGORY_COLORS[opp.category] || 'badge-gray'}`}>{opp.category}</span>
             {opp.format && <span className="badge badge-gray">{FORMAT_ICONS[opp.format] || ''} {opp.format}</span>}
@@ -60,23 +60,23 @@ export default function OpportunityCard({ opportunity: opp }: Props) {
             disabled={saving || !user}
             title={!user ? 'Войдите чтобы сохранить' : (isSaved ? 'Убрать из сохранённых' : 'Сохранить')}
             style={{
-              width: '36px', height: '36px', borderRadius: '8px',
-              border: `1px solid ${isSaved ? 'rgba(108,99,255,0.5)' : 'var(--border)'}`,
-              background: isSaved ? 'rgba(108,99,255,0.15)' : 'transparent',
-              color: isSaved ? 'var(--accent-light)' : 'var(--text-muted)',
+              width: '32px', height: '32px', borderRadius: '50%',
+              border: `1px solid ${isSaved ? 'var(--accent)' : 'transparent'}`,
+              background: isSaved ? 'var(--accent-glow)' : 'rgba(255,255,255,0.05)',
+              color: isSaved ? 'var(--accent)' : 'var(--text-muted)',
               cursor: user ? 'pointer' : 'not-allowed',
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               transition: 'all 0.2s', flexShrink: 0,
             }}
           >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5">
               <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
             </svg>
           </button>
         </div>
 
         {/* Title */}
-        <h3 style={{ fontSize: '17px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '10px', lineHeight: '1.3' }}>
+        <h3 className="heading-font" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px', lineHeight: '1.3' }}>
           {opp.title}
         </h3>
 
