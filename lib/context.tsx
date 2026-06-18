@@ -54,23 +54,24 @@ export function AppProvider({ children }: { children: ReactNode }) {
   async function initAuth(sid: string) {
     setAuthLoading(true)
 
-    // Check Supabase auth session first
-    const { data: { session } } = await supabase.auth.getSession()
-    if (session?.user) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('auth_id', session.user.id)
-        .maybeSingle()
-      if (profile) {
-        setUser(profile)
-        if (profile.language) setLangState(profile.language)
-        setAuthLoading(false)
-        return
+    // Check localStorage for saved auth
+    try {
+      const saved = localStorage.getItem('mentoria_auth')
+      if (saved) {
+        const authData = JSON.parse(saved)
+        if (authData.id) {
+          const { data: profile } = await supabase.from('users').select('*').eq('id', authData.id).maybeSingle()
+          if (profile) {
+            setUser(profile)
+            if (profile.language) setLangState(profile.language)
+            setAuthLoading(false)
+            return
+          }
+        }
       }
-    }
+    } catch {}
 
-    // Fallback: load by session_id (anonymous/legacy users)
+    // Fallback: load by session_id
     const { data } = await supabase.from('users').select('*').eq('session_id', sid).maybeSingle()
     if (data) {
       setUser(data)
@@ -78,20 +79,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setAuthLoading(false)
   }
-
-  // Listen to auth changes
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        const { data: profile } = await supabase.from('users').select('*').eq('auth_id', session.user.id).maybeSingle()
-        if (profile) setUser(profile)
-      }
-      if (event === 'SIGNED_OUT') {
-        setUser(null)
-      }
-    })
-    return () => subscription.unsubscribe()
-  }, [])
 
   async function refreshSaved() {
     if (!user) return
@@ -113,7 +100,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function logout() {
-    await supabase.auth.signOut()
+    localStorage.removeItem('mentoria_auth')
     setUser(null)
     setSavedIds(new Set())
   }

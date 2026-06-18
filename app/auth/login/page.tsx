@@ -21,29 +21,23 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
 
-    let email = login
-    if (!login.includes('@')) {
-      const { data: u } = await supabase.from('users').select('email').eq('username', login).maybeSingle()
-      if (!u?.email) { setError('Пользователь не найден'); setLoading(false); return }
-      email = u.email
-    }
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ login, password }),
+    })
+    const data = await res.json()
 
-    const { data, error: authErr } = await supabase.auth.signInWithPassword({ email, password })
-    if (authErr) {
-      setError(authErr.message === 'Invalid login credentials' ? 'Неверный логин или пароль' : authErr.message)
-      setLoading(false); return
-    }
+    if (!res.ok) { setError(data.error); setLoading(false); return }
 
-    if (data.user) {
-      const { data: profile } = await supabase.from('users').select('*').eq('auth_id', data.user.id).maybeSingle()
-      if (profile) {
-        setUser(profile)
-        localStorage.setItem('mentoria_session_id', profile.session_id)
-      }
-    }
+    localStorage.setItem('mentoria_session_id', data.user.session_id)
+    localStorage.setItem('mentoria_auth', JSON.stringify(data.user))
+
+    const { data: profile } = await supabase.from('users').select('*').eq('id', data.user.id).single()
+    if (profile) setUser(profile)
 
     setLoading(false)
-    router.push('/dashboard')
+    router.push(data.user.onboarding_done ? '/dashboard' : '/onboarding')
   }
 
   return (
@@ -54,15 +48,15 @@ export default function LoginPage() {
             <GraduationCap size={28} />
           </span>
           <h1 className="text-2xl font-extrabold text-ink">Вход в Mentoria Hub</h1>
-          <p className="mt-1 text-sm text-muted">Никнейм или email + пароль</p>
+          <p className="mt-1 text-sm text-muted">Никнейм + пароль</p>
         </div>
 
         <form onSubmit={handleSubmit} className="card space-y-4 p-6">
           {error && <div className="rounded-lg bg-red-500/10 border border-red-500/20 px-3 py-2 text-sm text-red-400">{error}</div>}
 
           <div>
-            <label className="label">Никнейм или Email</label>
-            <input className="input" placeholder="ivan_2026 или email@example.com" value={login} onChange={e => setLogin(e.target.value)} required />
+            <label className="label">Никнейм</label>
+            <input className="input" placeholder="ivan_2026" value={login} onChange={e => setLogin(e.target.value)} required />
           </div>
 
           <div>
