@@ -6,6 +6,7 @@ import { SavedItem, Opportunity } from '@/types'
 import { useApp } from '@/lib/context'
 import Link from 'next/link'
 import KanbanBoard from '@/components/KanbanBoard'
+import ActivityHeatmap from '@/components/ActivityHeatmap'
 import { Bookmark, BookOpen, CalendarClock, Sparkles, Pencil, GraduationCap } from 'lucide-react'
 import { fmtDate, daysLeft } from '@/lib/format'
 
@@ -87,6 +88,11 @@ export default function DashboardPage() {
           </p>
         </div>
         <Link href="/onboarding" className="btn-outline text-sm"><Pencil size={15} /> Изменить профиль</Link>
+      </div>
+
+      {/* Activity Heatmap */}
+      <div className="mb-8">
+        <ActivityHeatmap />
       </div>
 
       {loading ? (

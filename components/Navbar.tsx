@@ -5,12 +5,13 @@ import { usePathname } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { useApp } from '@/lib/context'
 import { Language } from '@/types'
-import { Moon, Sun, Menu, X, GraduationCap, Compass, LayoutDashboard, Shield, BookOpen, Map, Library } from 'lucide-react'
+import { Moon, Sun, Menu, X, GraduationCap, Compass, LayoutDashboard, Shield, BookOpen, Map, Library, LogOut, User as UserIcon, FileText } from 'lucide-react'
 
 const NAV = [
   { href: '/opportunities', key: 'nav.opportunities', icon: Compass },
   { href: '/courses', key: 'nav.courses', icon: BookOpen },
   { href: '/knowledge', key: 'nav.knowledge', icon: Library },
+  { href: '/essays', key: 'nav.essays', icon: FileText },
   { href: '/roadmap', key: 'nav.roadmap', icon: Map },
   { href: '/dashboard', key: 'nav.dashboard', icon: LayoutDashboard },
   { href: '/admin', key: 'nav.admin', icon: Shield },
@@ -23,7 +24,7 @@ const LANGS: { code: Language; label: string }[] = [
 ]
 
 export default function Navbar() {
-  const { t, lang, setLang, user } = useApp()
+  const { t, lang, setLang, user, logout } = useApp()
   const pathname = usePathname()
   const [open, setOpen] = useState(false)
   const [theme, setTheme] = useState<'dark' | 'light'>('dark')
@@ -106,10 +107,22 @@ export default function Navbar() {
             {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
           </button>
 
-          {/* CTA */}
-          <Link href={user ? '/dashboard' : '/onboarding'} className="btn-primary hidden sm:inline-flex !py-1.5 !px-3 text-xs">
-            {user ? t('nav.dashboard') : t('hero.cta.join')}
-          </Link>
+          {/* Auth */}
+          {user ? (
+            <div className="hidden items-center gap-1.5 sm:flex">
+              <Link href="/dashboard" className="flex items-center gap-1.5 rounded-lg bg-brand/10 px-2.5 py-1.5 text-xs font-bold text-brand">
+                <UserIcon size={14} /> {(user as any).username || t('nav.dashboard')}
+              </Link>
+              <button onClick={logout} className="grid size-8 place-items-center rounded-lg border border-line text-muted hover:text-red-400 cursor-pointer" title="Выйти">
+                <LogOut size={14} />
+              </button>
+            </div>
+          ) : (
+            <div className="hidden items-center gap-1.5 sm:flex">
+              <Link href="/auth/login" className="btn-ghost !py-1.5 !px-3 text-xs">Войти</Link>
+              <Link href="/auth/register" className="btn-primary !py-1.5 !px-3 text-xs">Регистрация</Link>
+            </div>
+          )}
 
           {/* Mobile hamburger */}
           <button

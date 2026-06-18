@@ -16,6 +16,8 @@ interface AppContextType {
   savedIds: Set<string>
   setSavedIds: (ids: Set<string>) => void
   refreshSaved: () => void
+  logout: () => void
+  authLoading: boolean
 }
 
 const AppContext = createContext<AppContextType | null>(null)
@@ -33,9 +35,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [sessionId, setSessionId] = useState<string>('')
   const [user, setUser] = useState<User | null>(null)
   const [savedIds, setSavedIds] = useState<Set<string>>(new Set())
+  const [authLoading, setAuthLoading] = useState(true)
 
   useEffect(() => {
-    // Initialize session
     let sid = localStorage.getItem('mentoria_session_id')
     if (!sid) {
       sid = generateSessionId()
@@ -43,25 +45,53 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     setSessionId(sid)
 
-    // Load language preference
     const savedLang = localStorage.getItem('mentoria_lang') as Language
     if (savedLang) setLangState(savedLang)
 
-    // Load user from DB
-    loadUser(sid)
+    initAuth(sid)
   }, [])
 
-  async function loadUser(sid: string) {
-    const { data } = await supabase
-      .from('users')
-      .select('*')
-      .eq('session_id', sid)
-      .single()
+  async function initAuth(sid: string) {
+    setAuthLoading(true)
+
+    // Check Supabase auth session first
+    const { data: { session } } = await supabase.auth.getSession()
+    if (session?.user) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('*')
+        .eq('auth_id', session.user.id)
+        .maybeSingle()
+      if (profile) {
+        setUser(profile)
+        if (profile.language) setLangState(profile.language)
+        setAuthLoading(false)
+        return
+      }
+    }
+
+    // Fallback: load by session_id (anonymous/legacy users)
+    const { data } = await supabase.from('users').select('*').eq('session_id', sid).maybeSingle()
     if (data) {
       setUser(data)
       if (data.language) setLangState(data.language)
     }
+    setAuthLoading(false)
   }
+
+  // Listen to auth changes
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session?.user) {
+        const { data: profile } = await supabase.from('users').select('*').eq('auth_id', session.user.id).maybeSingle()
+        if (profile) setUser(profile)
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null)
+      }
+    })
+    return () => subscription.unsubscribe()
+  }, [])
 
   async function refreshSaved() {
     if (!user) return
@@ -69,9 +99,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       .from('saved_items')
       .select('opportunity_id')
       .eq('user_id', user.id)
-    if (data) {
-      setSavedIds(new Set(data.map((d: any) => d.opportunity_id)))
-    }
+    if (data) setSavedIds(new Set(data.map((d: any) => d.opportunity_id)))
   }
 
   useEffect(() => {
@@ -81,9 +109,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   function setLang(l: Language) {
     setLangState(l)
     localStorage.setItem('mentoria_lang', l)
-    if (user) {
-      supabase.from('users').update({ language: l }).eq('id', user.id)
-    }
+    if (user) supabase.from('users').update({ language: l }).eq('id', user.id)
+  }
+
+  async function logout() {
+    await supabase.auth.signOut()
+    setUser(null)
+    setSavedIds(new Set())
   }
 
   const translate = (key: string) => t(key, lang)
@@ -92,7 +124,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <AppContext.Provider value={{
       lang, setLang, t: translate,
       sessionId, user, setUser,
-      savedIds, setSavedIds, refreshSaved
+      savedIds, setSavedIds, refreshSaved,
+      logout, authLoading
     }}>
       {children}
     </AppContext.Provider>
