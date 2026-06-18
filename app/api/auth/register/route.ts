@@ -8,9 +8,9 @@ const supabase = createClient(
 )
 
 export async function POST(req: NextRequest) {
-  const { username, password, code, token } = await req.json()
+  const { username, password, phone } = await req.json()
 
-  if (!username || !password || !code || !token) {
+  if (!username || !password || !phone) {
     return NextResponse.json({ error: 'Заполни все поля' }, { status: 400 })
   }
   if (username.length < 3 || !/^[a-zA-Z0-9_]+$/.test(username)) {
@@ -19,70 +19,48 @@ export async function POST(req: NextRequest) {
   if (password.length < 6) {
     return NextResponse.json({ error: 'Пароль мин. 6 символов' }, { status: 400 })
   }
-
-  // Check username uniqueness
-  const { data: existing } = await supabase.from('users').select('id').eq('username', username).maybeSingle()
-  if (existing) {
-    return NextResponse.json({ error: 'Никнейм уже занят' }, { status: 400 })
+  if (phone.replace(/\D/g, '').length < 10) {
+    return NextResponse.json({ error: 'Неверный номер телефона' }, { status: 400 })
   }
 
-  // Verify code
-  const { data: vc } = await supabase
-    .from('verification_codes')
-    .select('*')
-    .eq('token', token)
-    .eq('code', code)
-    .eq('used', false)
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
+  const { data: byName } = await supabase.from('users').select('id').eq('username', username).maybeSingle()
+  if (byName) return NextResponse.json({ error: 'Никнейм уже занят' }, { status: 400 })
 
-  if (!vc) {
-    return NextResponse.json({ error: 'Неверный или просроченный код' }, { status: 400 })
-  }
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+  const { data: byPhone } = await supabase.from('users').select('id').eq('phone', cleanPhone).maybeSingle()
+  if (byPhone) return NextResponse.json({ error: 'Этот номер уже зарегистрирован' }, { status: 400 })
 
-  // Create user
   const hash = await hashPassword(password)
   const { data: user, error } = await supabase.from('users').insert({
     username,
     password_hash: hash,
-    telegram_chat_id: vc.telegram_chat_id,
+    phone: cleanPhone,
     session_id: crypto.randomUUID(),
     onboarding_done: false,
   }).select().single()
 
-  if (error) {
-    return NextResponse.json({ error: 'Ошибка создания аккаунта' }, { status: 500 })
-  }
+  if (error) return NextResponse.json({ error: 'Ошибка создания аккаунта: ' + error.message }, { status: 500 })
 
-  // Mark code as used
-  await supabase.from('verification_codes').update({ used: true }).eq('id', vc.id)
-
-  return NextResponse.json({ user: { id: user.id, username: user.username, session_id: user.session_id } })
+  return NextResponse.json({ user: { id: user.id, username: user.username, session_id: user.session_id, onboarding_done: false } })
 }
 
-// PATCH: reset password
+// PATCH: reset password by phone
 export async function PATCH(req: NextRequest) {
-  const { username, password, code, token } = await req.json()
+  const { username, phone, newPassword } = await req.json()
 
-  if (!username || !password || !code || !token) {
+  if (!username || !phone || !newPassword) {
     return NextResponse.json({ error: 'Заполни все поля' }, { status: 400 })
   }
+  if (newPassword.length < 6) {
+    return NextResponse.json({ error: 'Пароль мин. 6 символов' }, { status: 400 })
+  }
 
-  const { data: vc } = await supabase
-    .from('verification_codes')
-    .select('*')
-    .eq('token', token)
-    .eq('code', code)
-    .eq('used', false)
-    .gt('expires_at', new Date().toISOString())
-    .maybeSingle()
+  const cleanPhone = phone.replace(/[\s\-\(\)]/g, '')
+  const { data: user } = await supabase.from('users').select('id').eq('username', username).eq('phone', cleanPhone).maybeSingle()
+  if (!user) return NextResponse.json({ error: 'Пользователь не найден или номер не совпадает' }, { status: 404 })
 
-  if (!vc) return NextResponse.json({ error: 'Неверный или просроченный код' }, { status: 400 })
+  const hash = await hashPassword(newPassword)
+  await supabase.from('users').update({ password_hash: hash }).eq('id', user.id)
 
-  const hash = await hashPassword(password)
-  const { error } = await supabase.from('users').update({ password_hash: hash }).eq('username', username)
-  if (error) return NextResponse.json({ error: 'Ошибка обновления' }, { status: 500 })
-
-  await supabase.from('verification_codes').update({ used: true }).eq('id', vc.id)
   return NextResponse.json({ ok: true })
 }
