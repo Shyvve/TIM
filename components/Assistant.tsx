@@ -1,146 +1,64 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { Sparkles, X, Send, AlertTriangle } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Sparkles, X, Send } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/context'
 import { daysLeft, fmtDate } from '@/lib/format'
+import React from 'react'
 
-const MAX_MESSAGES_PER_WINDOW = 20
-const WINDOW_MS = 4 * 60 * 60 * 1000 // 4 часа
-const MAX_INPUT_LENGTH = 500
-const ADMIN_PASSWORD = 'mentoria2025'
+const MAX_MESSAGES = 20
+const WINDOW_MS = 4 * 60 * 60 * 1000
+const MAX_INPUT = 500
+const ADMIN_PW = 'mentoria2025'
 
-const SYSTEM_PROMPT = `Ты — AI-ассистент платформы Mentoria Hub. Ты помогаешь школьникам 8–12 классов из Центральной Азии (Казахстан, Узбекистан, Кыргызстан и т.д.) с поступлением в топовые университеты мира.
+const SYSTEM_PROMPT = `Ты — AI-ассистент платформы Mentoria Hub. Ты помогаешь школьникам 8–12 классов из Центральной Азии с поступлением в топовые университеты мира.
 
-═══ ЭКСПЕРТНЫЕ ЗНАНИЯ ПО ТЕСТАМ ═══
+═══ ТЕСТЫ ═══
 
 【IELTS Academic】
-- Формат: Listening (30 мин, 40 вопросов) → Reading (60 мин, 3 пассажа, 40 вопросов) → Writing (60 мин, Task 1 — график 150+ слов, Task 2 — эссе 250+ слов) → Speaking (11-14 мин, 3 части).
-- Шкала: 0-9 по каждой секции, overall = среднее округлённое до 0.5. Топ-вузы: 7.0-7.5 overall, минимум 6.5 по каждой секции.
-- Writing оценивается по 4 критериям: Task Achievement, Coherence & Cohesion, Lexical Resource, Grammatical Range & Accuracy.
-- Speaking: Part 1 (4-5 мин, общие вопросы), Part 2 (cue card, 2 мин монолог, 1 мин подготовка), Part 3 (4-5 мин, глубокая дискуссия).
-- Стоимость: ~$250. Действует 2 года. Можно сдавать бумажный или компьютерный.
-- Альтернативы: TOEFL iBT (принимается почти везде наравне), Duolingo English Test ($59, принимают ~4000 вузов, быстрее и дешевле).
-- Лучшие бесплатные ресурсы: ielts.org/sample-questions, IELTS Liz (youtube), IELTS Simon (ielts-simon.com), British Council IELTS Ready, E2 IELTS.
+Listening (30м, 40 вопр.) → Reading (60м, 3 пассажа, 40 вопр.) → Writing (60м, Task1 график 150+ сл., Task2 эссе 250+ сл.) → Speaking (11-14м, 3 части). Шкала 0-9, overall = среднее ±0.5. Топ-вузы: 7.0-7.5, мин 6.5/секция. Writing: Task Achievement, Coherence, Lexical Resource, Grammar. Стоимость ~$250, действует 2 года. Альтернативы: TOEFL iBT, Duolingo ($59). Ресурсы: ielts.org, IELTS Liz (youtube), ielts-simon.com, British Council IELTS Ready, E2 IELTS.
 
-【SAT (Digital)】
-- С 2024 — ТОЛЬКО цифровой (приложение Bluebook). Адаптивный: сложность 2-го модуля зависит от 1-го.
-- Формат: Reading & Writing (2 модуля по 32 мин, 27 вопросов каждый) + Math (2 модуля по 35 мин, 22 вопросов каждый) = 2 часа 14 мин.
-- Шкала: 400-1600 (R&W 200-800 + Math 200-800). Средний балл ~1060. Цели: 1400+ (топ-50 вузов), 1500+ (топ-20), 1550+ (Ivy League).
-- R&W: короткие пассажи (до 150 слов), grammar (Standard English Conventions), vocabulary in context, evidence-based reasoning, rhetoric.
-- Math: алгебра, линейные/квадратные уравнения, advanced math, геометрия/тригонометрия, статистика. Калькулятор Desmos встроен в оба модуля.
-- Стоимость: $68 (вне США может быть дороже). SAT fee waivers есть через школу.
-- Сдавать: 7 раз в год (авг, окт, нояб, дек, март, май, июнь). Superscore — вузы берут лучший R&W + лучший Math из разных попыток.
-- Test Optional: ~80% вузов test-optional с 2020. НО если балл высокий — подача с баллом усиливает заявку. MIT, Georgetown, Purdue — test required.
-- Лучшие бесплатные ресурсы: Bluebook (bluebook.collegeboard.org), Khan Academy Digital SAT, Student Question Bank (satsuite.collegeboard.org), Schoolhouse.world.
-- Лучшие книги: College Panda Math, Critical Reader (Meltzer), SAT Prep Black Book (Barrett).
+【SAT Digital】
+ТОЛЬКО цифровой (Bluebook). Адаптивный. R&W (2×32м, 27 вопр.) + Math (2×35м, 22 вопр.) = 2ч14м. Шкала 400-1600. Среднее ~1060. Цели: 1400+ (топ-50), 1500+ (топ-20), 1550+ (Ivy). Math: алгебра, квадратные ур., геометрия, статистика. Desmos встроен. $68. 7 раз/год. Superscore. ~80% вузов test-optional, но высокий балл усиливает заявку. MIT/Georgetown/Purdue — required. Ресурсы: Bluebook (bluebook.collegeboard.org), Khan Academy, Schoolhouse.world. Книги: College Panda Math, Meltzer, Black Book.
 
-【Другие тесты】
-- AP (Advanced Placement): экзамены по предметам, 1-5 баллов. AP 4-5 показывают готовность к вузу. Можно получить кредиты. $98 за экзамен.
-- SAT Subject Tests — ОТМЕНЕНЫ с 2021. Не существуют больше.
-- ACT: альтернатива SAT. 1-36 баллов. English, Math, Reading, Science + опц. Writing. Популярнее на Midwest/South США.
+SAT Subject Tests ОТМЕНЕНЫ с 2021. AP: 1-5, $98/экзамен. ACT: 1-36, альтернатива SAT.
 
 ═══ ПОСТУПЛЕНИЕ ═══
 
-【Need-blind для иностранцев (2026)】
-Эти вузы НЕ смотрят на финансовый запрос при приёме: Harvard, MIT, Princeton, Yale, Amherst, Bowdoin, Brown (с 2029), Dartmouth, Notre Dame (с 2029), Washington and Lee.
-Все остальные — need-aware (запрос МОЖЕТ снизить шансы).
+Need-blind для иностранцев (2026): Harvard, MIT, Princeton, Yale, Amherst, Bowdoin, Brown, Dartmouth, Notre Dame, Washington and Lee. Остальные — need-aware.
 
-【College Essays】
-- Personal Statement (Common App): 650 слов. Показывает КТО ты, не ЧТО делал. 7 промптов на выбор.
-- Supplemental essays: Why Us (исследуй вуз — конкретные профессора, программы, клубы), Why Major, Diversity, Activity Essay.
-- Лучший ресурс: College Essay Guy (collegeessayguy.com) — всё бесплатно.
-
-【Extracurriculars】
-- Качество > количество. "Spike" (глубина в одном направлении) ценится выше списка.
-- Платные research/leadership программы комиссии ценят СЛАБО. Реальный impact > купленный сертификат.
-- Топ олимпиады: IMO, IPhO, IChO, IBO, IOI, IOL.
-- Топ конкурсы: Regeneron ISEF, Regeneron STS, Conrad Challenge, Diamond Challenge.
-- Топ летние программы (бесплатные, отбор 2-10%): RSI (MIT), MITES (MIT), PROMYS, Ross Math, SSP, YYGS (Yale).
+Essays: Personal Statement 650 сл. — показывает КТО ты. Ресурс: collegeessayguy.com. Extracurriculars: spike > список. Топ: IMO, IPhO, IOI, ISEF, RSI, MITES, YYGS, SSP.
 
 ═══ ПРАВИЛА ═══
-1. Отвечай на русском по умолчанию. Если пользователь пишет на другом языке — отвечай на нём.
-2. Будь ТОЧНЫМ: давай конкретные цифры, баллы, даты. Если не уверен — скажи "уточни на официальном сайте".
-3. НИКОГДА не путай форматы тестов. SAT Subject Tests отменены. SAT теперь цифровой. IELTS и TOEFL — разные тесты.
-4. Рекомендуй бесплатные ресурсы в первую очередь.
-5. Если спрашивают про возможности — используй данные из раздела АКТУАЛЬНЫЕ ДАННЫЕ ПЛАТФОРМЫ ниже.
-6. Мотивируй, но будь честным — не обещай 100% поступление.
-7. Отвечай кратко (3-5 предложений), если не просят подробнее.
-8. Если вопрос не по теме образования — вежливо верни к теме.
-9. Упоминай разделы сайта: /knowledge (база знаний), /opportunities (возможности), /courses (курсы), /roadmap.
-10. Ссылки оформляй так: название (url) — чтобы пользователь мог кликнуть.
-11. ЭКОНОМЬ токены: не повторяй вопрос пользователя, не пиши длинные вступления. Сразу давай ответ.
-12. Если пользователь просит написать что-то бессмысленное много раз, генерировать код, писать эссе за него или что-то не по теме — вежливо откажи и верни к теме поступления.
-13. НЕ пиши больше 5-7 предложений без прямой просьбы "подробнее" или "расскажи больше".`
+1. Русский по умолчанию. Другой язык — если пользователь пишет на нём.
+2. Точные цифры, баллы, даты. Не уверен → "уточни на офиц. сайте".
+3. НЕ путай форматы тестов.
+4. Бесплатные ресурсы в первую очередь.
+5. Используй данные платформы ниже для ответов про возможности.
+6. Кратко (3-5 предложений). Подробнее — только по просьбе.
+7. Ссылки: пиши полный URL (https://...) в тексте ответа.
+8. ЭКОНОМЬ токены. Без длинных вступлений.
+9. Не пиши за пользователя эссе/тексты целиком. НО ПОМОГАЙ со структурой, идеями, планом, обратной связью по черновику. Если просят написать эссе — предложи структуру, а не готовый текст.
+10. Бессмысленные запросы (повторения, спам, не по теме) — вежливо откажи.
+11. Упоминай: /knowledge, /opportunities, /courses, /roadmap.`
 
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
+interface Message { role: 'user' | 'assistant'; content: string }
 
-interface RateLimitState {
-  timestamps: number[]
-}
-
-function getRateLimit(): RateLimitState {
-  try {
-    const raw = localStorage.getItem('mh_chat_rl')
-    if (raw) return JSON.parse(raw)
-  } catch {}
-  return { timestamps: [] }
-}
-
-function saveRateLimit(state: RateLimitState) {
-  localStorage.setItem('mh_chat_rl', JSON.stringify(state))
-}
-
-function resetRateLimit() {
-  localStorage.removeItem('mh_chat_rl')
-}
-
-function checkRateLimit(): { ok: boolean; remaining: number; resetIn: string } {
-  const state = getRateLimit()
-  const now = Date.now()
-  const valid = state.timestamps.filter(t => now - t < WINDOW_MS)
-  const remaining = MAX_MESSAGES_PER_WINDOW - valid.length
-  if (remaining <= 0) {
-    const oldest = Math.min(...valid)
-    const resetMs = WINDOW_MS - (now - oldest)
-    const mins = Math.ceil(resetMs / 60000)
-    return { ok: false, remaining: 0, resetIn: `${Math.floor(mins / 60)}ч ${mins % 60}м` }
-  }
-  return { ok: true, remaining, resetIn: '' }
-}
-
-function recordMessage() {
-  const state = getRateLimit()
-  const now = Date.now()
-  state.timestamps = [...state.timestamps.filter(t => now - t < WINDOW_MS), now]
-  saveRateLimit(state)
-}
-
-function renderMessage(text: string) {
-  const lines = text.split('\n')
-  return lines.map((line, i) => {
+function renderMsg(text: string) {
+  return text.split('\n').map((line, i) => {
+    if (!line.trim()) return <br key={i} />
     const parts: (string | React.ReactElement)[] = []
-    const urlRegex = /(https?:\/\/[^\s\)]+)/g
-    let lastIndex = 0
-    let match
-    while ((match = urlRegex.exec(line)) !== null) {
-      if (match.index > lastIndex) parts.push(line.slice(lastIndex, match.index))
-      const url = match[1]
-      const domain = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]
-      parts.push(
-        <a key={`${i}-${match.index}`} href={url} target="_blank" rel="noopener noreferrer" className="text-brand underline hover:text-brand-2 break-all">
-          {domain} ↗
-        </a>
-      )
-      lastIndex = match.index + match[0].length
+    const re = /(https?:\/\/[^\s\)]+)/g
+    let last = 0, m
+    while ((m = re.exec(line)) !== null) {
+      if (m.index > last) parts.push(line.slice(last, m.index))
+      const url = m[1]
+      parts.push(<a key={`${i}-${m.index}`} href={url} target="_blank" rel="noopener noreferrer" className="text-brand underline break-all">{url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]} ↗</a>)
+      last = m.index + m[0].length
     }
-    if (lastIndex < line.length) parts.push(line.slice(lastIndex))
-    if (parts.length === 0 && line.trim() === '') return <br key={i} />
-    return <p key={i} className="mb-1">{parts}</p>
+    if (last < line.length) parts.push(line.slice(last))
+    return <span key={i} className="block">{parts}</span>
   })
 }
 
@@ -148,200 +66,195 @@ export default function Assistant() {
   const { user } = useApp()
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Привет! Я AI-ассистент Mentoria Hub.\n\nЗнаю всё про IELTS, SAT, поступление, стипендии и текущие хакатоны на платформе. Спрашивай!' },
-  ])
+  const [messages, setMessages] = useState<Message[]>([])
   const [loading, setLoading] = useState(false)
-  const [siteContext, setSiteContext] = useState('')
-  const [limitHit, setLimitHit] = useState(false)
-  const [adminInput, setAdminInput] = useState(false)
+  const [siteCtx, setSiteCtx] = useState('')
+  const [remaining, setRemaining] = useState(MAX_MESSAGES)
+  const [adminMode, setAdminMode] = useState(false)
+  const [historyLoaded, setHistoryLoaded] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+
+  const sessionId = typeof window !== 'undefined' ? (localStorage.getItem('mentoria_session_id') || 'anon') : 'anon'
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-  }, [messages])
+  }, [messages, loading])
 
   useEffect(() => {
-    if (open) fetchSiteContext()
-  }, [open, user])
+    if (open && !historyLoaded) {
+      loadHistory()
+      fetchSiteCtx()
+      checkLimit()
+    }
+  }, [open])
 
-  async function fetchSiteContext() {
+  useEffect(() => {
+    if (open && user) fetchSiteCtx()
+  }, [user])
+
+  async function loadHistory() {
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('role, content')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true })
+      .limit(50)
+
+    if (data && data.length > 0) {
+      setMessages(data.map(d => ({ role: d.role as 'user' | 'assistant', content: d.content })))
+    } else {
+      setMessages([{ role: 'assistant', content: 'Привет! Я AI-ассистент Mentoria Hub.\nЗнаю всё про IELTS, SAT, поступление, стипендии и текущие возможности на платформе. Спрашивай!' }])
+    }
+    setHistoryLoaded(true)
+  }
+
+  async function saveMsg(role: string, content: string) {
+    await supabase.from('chat_messages').insert({ session_id: sessionId, role, content })
+  }
+
+  async function checkLimit(): Promise<boolean> {
+    const { data } = await supabase
+      .from('chat_messages')
+      .select('created_at')
+      .eq('session_id', sessionId)
+      .eq('role', 'user')
+      .gte('created_at', new Date(Date.now() - WINDOW_MS).toISOString())
+      .order('created_at', { ascending: false })
+
+    const count = data?.length || 0
+    setRemaining(Math.max(0, MAX_MESSAGES - count))
+    return count < MAX_MESSAGES
+  }
+
+  async function resetLimit() {
+    await supabase.from('chat_messages').delete().eq('session_id', sessionId)
+    setMessages([{ role: 'assistant', content: 'Лимит сброшен. История очищена. Можешь продолжать!' }])
+    setRemaining(MAX_MESSAGES)
+    setAdminMode(false)
+  }
+
+  async function fetchSiteCtx() {
     const { data: opps } = await supabase
       .from('opportunities')
       .select('title, category, direction, deadline, format, apply_url, grade_level')
-      .order('deadline', { ascending: true })
-      .limit(30)
-
-    const { data: courses } = await supabase
-      .from('courses')
-      .select('title, description, level, skill_tags')
-
+      .order('deadline', { ascending: true }).limit(30)
+    const { data: courses } = await supabase.from('courses').select('title, description, level')
     const now = new Date()
-    const upcoming = (opps || []).filter(o => new Date(o.deadline) >= now)
-    const soonest = upcoming.slice(0, 10)
-
-    let ctx = '\n═══ АКТУАЛЬНЫЕ ДАННЫЕ ПЛАТФОРМЫ ═══\n'
-
-    if (user) {
-      ctx += `\nПрофиль пользователя: ${user.grade} класс, интересы: ${user.interests?.join(', ') || 'не указаны'}, цель: ${user.goal || 'не указана'}\n`
-    }
-
-    ctx += `\nБлижайшие возможности (${upcoming.length} активных):\n`
-    soonest.forEach(o => {
-      const d = daysLeft(o.deadline)
-      ctx += `- ${o.title} [${o.category}/${o.direction}] — дедлайн ${fmtDate(o.deadline)} (${d} дн.) — ${o.format} — классы: ${o.grade_level?.join(',')} — ${o.apply_url}\n`
+    const upcoming = (opps || []).filter(o => new Date(o.deadline) >= now).slice(0, 10)
+    let ctx = '\n═══ ДАННЫЕ ПЛАТФОРМЫ ═══\n'
+    if (user) ctx += `Профиль: ${user.grade} кл., интересы: ${user.interests?.join(', ') || '-'}, цель: ${user.goal || '-'}\n`
+    ctx += `Ближайшие возможности:\n`
+    upcoming.forEach(o => {
+      ctx += `• ${o.title} [${o.category}] дедлайн ${fmtDate(o.deadline)} (${daysLeft(o.deadline)}дн.) ${o.apply_url}\n`
     })
-
-    if (courses?.length) {
-      ctx += `\nКурсы на платформе:\n`
-      courses.forEach(c => {
-        ctx += `- "${c.title}" (${c.level}) — ${c.description?.slice(0, 100)}...\n`
-      })
-    }
-
-    setSiteContext(ctx)
-  }
-
-  function handleAdminUnlock(password: string) {
-    if (password === ADMIN_PASSWORD) {
-      resetRateLimit()
-      setLimitHit(false)
-      setAdminInput(false)
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Лимит сброшен. Можешь продолжать!' }])
-    } else {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Неверный пароль.' }])
-      setAdminInput(false)
-    }
+    if (courses?.length) { ctx += `Курсы:\n`; courses.forEach(c => { ctx += `• ${c.title} (${c.level})\n` }) }
+    setSiteCtx(ctx)
   }
 
   async function send(preset?: string) {
     const text = (preset ?? input).trim()
     if (!text || loading) return
 
-    if (text.length > MAX_INPUT_LENGTH) {
-      setMessages(prev => [...prev, { role: 'user', content: text.slice(0, 50) + '...' }, { role: 'assistant', content: `⚠️ Сообщение слишком длинное (макс. ${MAX_INPUT_LENGTH} символов). Сформулируй короче.` }])
-      setInput('')
-      return
+    if (adminMode) {
+      if (text === ADMIN_PW) { await resetLimit(); setInput(''); return }
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Неверный пароль.' }])
+      setAdminMode(false); setInput(''); return
     }
 
-    const limit = checkRateLimit()
-    if (!limit.ok) {
-      setLimitHit(true)
-      setMessages(prev => [...prev, { role: 'user', content: text }, { role: 'assistant', content: `⚠️ Лимит сообщений (${MAX_MESSAGES_PER_WINDOW} за 4 часа) исчерпан. Обновление через ${limit.resetIn}.\n\nЕсли у тебя есть пароль администратора — напиши его чтобы сбросить лимит.` }])
-      setInput('')
-      setAdminInput(true)
-      return
+    if (text.length > MAX_INPUT) {
+      setMessages(prev => [...prev, { role: 'user', content: text.slice(0, 60) + '…' }, { role: 'assistant', content: `Макс. ${MAX_INPUT} символов.` }])
+      setInput(''); return
     }
 
-    if (adminInput) {
-      handleAdminUnlock(text)
-      setInput('')
-      return
+    const allowed = await checkLimit()
+    if (!allowed) {
+      setMessages(prev => [...prev, { role: 'user', content: text }, { role: 'assistant', content: `Лимит (${MAX_MESSAGES} сообщений / 4 часа) исчерпан. Введи пароль администратора чтобы сбросить.` }])
+      setAdminMode(true); setInput(''); return
     }
 
     setInput('')
-    recordMessage()
-
     const userMsg: Message = { role: 'user', content: text }
-    const newMessages = [...messages, userMsg]
-    setMessages(newMessages)
+    const newMsgs = [...messages, userMsg]
+    setMessages(newMsgs)
     setLoading(true)
+    await saveMsg('user', text)
+    setRemaining(r => Math.max(0, r - 1))
 
     try {
-      const fullPrompt = SYSTEM_PROMPT + siteContext
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          messages: newMessages.map(m => ({ role: m.role, content: m.content })),
-          systemPrompt: fullPrompt,
+          messages: newMsgs.slice(-12).map(m => ({ role: m.role, content: m.content })),
+          systemPrompt: SYSTEM_PROMPT + siteCtx,
         }),
       })
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error || 'Ошибка сервера')
-      }
-
+      if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.error || 'Ошибка') }
       const data = await res.json()
-      setMessages([...newMessages, { role: 'assistant', content: data.content }])
+      const reply = data.content
+      setMessages([...newMsgs, { role: 'assistant', content: reply }])
+      await saveMsg('assistant', reply)
     } catch (e: any) {
-      setMessages([...newMessages, { role: 'assistant', content: `⚠️ ${e.message || 'Не удалось получить ответ.'}` }])
-    } finally {
-      setLoading(false)
-    }
+      const errMsg = `⚠️ ${e.message || 'Ошибка'}`
+      setMessages([...newMsgs, { role: 'assistant', content: errMsg }])
+    } finally { setLoading(false) }
   }
-
-  const limit = checkRateLimit()
 
   return (
     <>
-      <button
-        onClick={() => setOpen((o) => !o)}
-        className="btn-primary fixed bottom-5 right-5 z-50 !rounded-full !px-4 !py-3 shadow-2xl"
-        aria-label="AI-ассистент"
-      >
+      <button onClick={() => setOpen(o => !o)} className="btn-primary fixed bottom-5 right-5 z-50 !rounded-full !px-4 !py-3 shadow-2xl" aria-label="AI">
         {open ? <X size={18} /> : <Sparkles size={18} />}
         <span className="hidden sm:inline">{open ? 'Закрыть' : 'AI-ассистент'}</span>
       </button>
 
       {open && (
         <div className="fadeup fixed bottom-20 right-5 z-50 flex h-[32rem] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
-          <div className="flex items-center gap-2 border-b border-line bg-surface-2 px-4 py-3">
-            <span className="grid size-8 place-items-center rounded-lg bg-brand/15 text-brand">
-              <Sparkles size={16} />
-            </span>
+          {/* Header */}
+          <div className="flex items-center gap-2 border-b border-line bg-surface-2 px-4 py-2.5">
+            <span className="grid size-7 place-items-center rounded-lg bg-brand/15 text-brand"><Sparkles size={14} /></span>
             <div className="flex-1">
               <p className="text-sm font-bold text-ink">AI-ассистент</p>
-              <p className="text-[11px] text-muted">Эксперт по поступлению</p>
             </div>
-            <span className="text-[10px] text-muted">{limit.remaining}/{MAX_MESSAGES_PER_WINDOW}</span>
+            <span className="rounded-md bg-surface px-1.5 py-0.5 text-[10px] font-semibold text-muted">{remaining}/{MAX_MESSAGES}</span>
           </div>
 
-          <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
+          {/* Messages */}
+          <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-3">
             {messages.map((m, i) => (
-              <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
-                <div
-                  className={`inline-block max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
-                    m.role === 'user' ? 'bg-brand text-white' : 'bg-surface-2 text-ink'
-                  }`}
-                >
-                  {m.role === 'assistant' ? renderMessage(m.content) : m.content}
+              <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-[13px] leading-relaxed ${
+                  m.role === 'user' ? 'bg-brand text-white' : 'bg-surface-2 text-ink'
+                }`}>
+                  {m.role === 'assistant' ? renderMsg(m.content) : m.content}
                 </div>
               </div>
             ))}
             {loading && (
-              <div>
-                <div className="inline-block rounded-2xl bg-surface-2 px-3 py-2 text-sm text-muted">
-                  Думаю...
-                </div>
+              <div className="flex justify-start">
+                <div className="rounded-2xl bg-surface-2 px-3 py-2 text-[13px] text-muted">Думаю...</div>
               </div>
             )}
           </div>
 
+          {/* Input */}
           <div className="border-t border-line p-2">
-            {!limitHit && (
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                {['Ближайший хакатон?', 'SAT vs ACT', 'Need-blind вузы', 'IELTS план'].map((p) => (
-                  <button key={p} onClick={() => send(p)} className="chip !py-0.5 text-[11px]">
-                    {p}
-                  </button>
+            {!adminMode && (
+              <div className="mb-1.5 flex flex-wrap gap-1">
+                {['Ближайший хакатон?', 'SAT план', 'Need-blind вузы', 'IELTS 7.0'].map(p => (
+                  <button key={p} onClick={() => send(p)} className="chip !py-0 !px-2 text-[10px]">{p}</button>
                 ))}
               </div>
             )}
             <div className="flex items-center gap-2">
               <input
                 value={input}
-                onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
-                onKeyDown={(e) => e.key === 'Enter' && send()}
-                placeholder={adminInput ? 'Пароль администратора...' : 'Спроси про поступление…'}
-                type={adminInput ? 'password' : 'text'}
-                className="input !py-2"
-                maxLength={MAX_INPUT_LENGTH}
+                onChange={e => setInput(e.target.value.slice(0, MAX_INPUT))}
+                onKeyDown={e => e.key === 'Enter' && send()}
+                placeholder={adminMode ? 'Пароль администратора...' : 'Спроси про поступление…'}
+                type={adminMode ? 'password' : 'text'}
+                className="input !py-1.5 !text-[13px]"
               />
-              <button onClick={() => send()} disabled={loading} className="btn-primary !px-3 !py-2" aria-label="Отправить">
-                <Send size={16} />
-              </button>
+              <button onClick={() => send()} disabled={loading} className="btn-primary !px-2.5 !py-1.5"><Send size={14} /></button>
             </div>
           </div>
         </div>
