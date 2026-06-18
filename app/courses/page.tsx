@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Course, Lesson, CourseProgress } from '@/types'
+import { Course } from '@/types'
 import { useApp } from '@/lib/context'
 import Link from 'next/link'
+import { BookOpen, PlayCircle } from 'lucide-react'
+import { dirColor } from '@/lib/format'
 
-const LEVEL_COLOR: Record<string, string> = {
-  'Начальный': 'badge-green',
-  'Средний': 'badge-yellow',
-  'Продвинутый': 'badge-orange',
+const LEVEL_TONE: Record<string, string> = {
+  'Начальный': '#16a34a',
+  'Средний': '#f59e0b',
+  'Продвинутый': '#dc2626',
 }
 
 export default function CoursesPage() {
@@ -26,7 +28,6 @@ export default function CoursesPage() {
     const { data } = await supabase.from('courses').select('*').order('created_at')
     if (data) {
       setCourses(data)
-      // Fetch lesson counts
       const counts: Record<string, number> = {}
       await Promise.all(data.map(async (c: Course) => {
         const { count } = await supabase.from('lessons').select('id', { count: 'exact', head: true }).eq('course_id', c.id)
@@ -61,88 +62,58 @@ export default function CoursesPage() {
     setProgress(pct)
   }
 
-  const COURSE_ICONS = ['📖', '🧮', '📝', '💻', '🌍', '🔬']
-
   return (
-    <div className="section">
-      <div className="container">
-        {/* Header */}
-        <div style={{ marginBottom: '48px' }}>
-          <span className="badge badge-accent" style={{ marginBottom: '12px' }}>📚 Обучение</span>
-          <h1 style={{ fontSize: 'clamp(28px,4vw,44px)', fontWeight: '800', marginBottom: '12px' }}>{t('courses.title')}</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '17px' }}>{t('courses.subtitle')}</p>
-        </div>
-
-        {loading ? (
-          <div className="grid-cards">
-            {[1,2,3].map(i => <div key={i} className="skeleton" style={{ height: '300px', borderRadius: '16px' }}/>)}
-          </div>
-        ) : (
-          <div className="grid-cards">
-            {courses.map((course, idx) => {
-              const pct = progress[course.id] || 0
-              const lessonCount = lessonCounts[course.id] || 0
-              const hasStarted = pct > 0
-              return (
-                <Link key={course.id} href={`/courses/${course.id}`} style={{ textDecoration: 'none' }}>
-                  <div className="card" style={{ padding: '28px', height: '100%', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
-                    {/* Icon */}
-                    <div style={{
-                      width: '60px', height: '60px',
-                      background: 'var(--gradient-accent)',
-                      borderRadius: '16px',
-                      display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: '28px', marginBottom: '20px',
-                    }}>
-                      {COURSE_ICONS[idx % COURSE_ICONS.length]}
-                    </div>
-
-                    {/* Level badge */}
-                    <div style={{ marginBottom: '12px' }}>
-                      <span className={`badge ${LEVEL_COLOR[course.level] || 'badge-gray'}`}>{course.level}</span>
-                    </div>
-
-                    <h2 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '10px', lineHeight: '1.3' }}>
-                      {course.title}
-                    </h2>
-                    <p style={{ color: 'var(--text-secondary)', fontSize: '14px', lineHeight: '1.6', flex: 1, marginBottom: '16px' }}>
-                      {course.description}
-                    </p>
-
-                    {/* Skill tags */}
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', marginBottom: '16px' }}>
-                      {course.skill_tags?.map(tag => <span key={tag} className="tag" style={{ fontSize: '11px' }}>#{tag}</span>)}
-                    </div>
-
-                    {/* Progress */}
-                    {user && (
-                      <div style={{ marginBottom: '16px' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', color: 'var(--text-muted)', marginBottom: '6px' }}>
-                          <span>{t('courses.progress')}</span>
-                          <span>{pct}%</span>
-                        </div>
-                        <div className="progress-bar">
-                          <div className="progress-fill" style={{ width: `${pct}%` }}/>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Bottom */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontSize: '13px', color: 'var(--text-muted)' }}>
-                        📝 {lessonCount} {t('courses.lessons')}
-                      </span>
-                      <span className="btn-primary btn-sm">
-                        {hasStarted ? t('courses.continue') : t('courses.start')} →
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )
-            })}
-          </div>
-        )}
+    <div className="section py-10">
+      <div className="mb-6">
+        <h1 className="text-3xl font-extrabold text-ink">{t('courses.title')}</h1>
+        <p className="mt-1 text-ink-soft">{t('courses.subtitle')}</p>
       </div>
+
+      {loading ? (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {[1, 2, 3].map((i) => <div key={i} className="skeleton" style={{ height: '360px' }} />)}
+        </div>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+          {courses.map((course) => {
+            const pct = progress[course.id] || 0
+            const lessonCount = lessonCounts[course.id] || 0
+            const hasStarted = pct > 0
+            const c1 = dirColor(course.skill_tags?.[0] || '')
+            const levelColor = LEVEL_TONE[course.level] || '#64748b'
+            return (
+              <Link key={course.id} href={`/courses/${course.id}`} className="card-hover fadeup flex flex-col overflow-hidden">
+                <div className="relative h-32" style={{ background: `linear-gradient(135deg, ${c1}, color-mix(in srgb, ${c1} 55%, #000))` }}>
+                  <BookOpen className="absolute right-4 top-4 text-white/40" size={48} />
+                </div>
+                <div className="flex flex-1 flex-col p-5">
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="badge" style={{ color: levelColor, background: `color-mix(in srgb, ${levelColor} 14%, transparent)` }}>{course.level}</span>
+                  </div>
+                  <h3 className="text-lg font-bold leading-snug text-ink">{course.title}</h3>
+                  <p className="mt-1.5 line-clamp-2 flex-1 text-sm text-ink-soft">{course.description}</p>
+                  <div className="mt-3 flex items-center gap-4 text-xs text-muted">
+                    <span className="inline-flex items-center gap-1"><PlayCircle size={14} /> {lessonCount} {t('courses.lessons')}</span>
+                  </div>
+                  {user && hasStarted ? (
+                    <div className="mt-4">
+                      <div className="mb-1 flex justify-between text-xs">
+                        <span className="font-semibold text-brand">{pct === 100 ? 'Завершён' : 'В процессе'}</span>
+                        <span className="text-muted">{pct}%</span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+                        <div className="bar-fill h-full rounded-full" style={{ width: `${pct}%`, background: 'linear-gradient(90deg, var(--color-brand), var(--color-accent-soft))' }} />
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="btn-primary mt-4 w-full text-sm">{t('courses.start')}</span>
+                  )}
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+      )}
     </div>
   )
 }

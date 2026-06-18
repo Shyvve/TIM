@@ -2,178 +2,164 @@
 
 import Link from 'next/link'
 import { useApp } from '@/lib/context'
-import { useEffect, useState } from 'react'
+import {
+  Compass, BookOpen, LayoutDashboard, Sparkles, ArrowRight, Search,
+  BadgeCheck, CalendarClock, Globe, Bot, Award, Users,
+} from 'lucide-react'
 
-const stats = [
-  { value: '31%', key: 'stats.seeking', color: 'var(--accent-light)' },
-  { value: '35%', key: 'stats.abandoned', color: '#f87171' },
-  { value: '2×', key: 'stats.complete', color: '#4ade80' },
+function FeatureCard({ icon: Icon, title, text, color }: { icon: any; title: string; text: string; color: string }) {
+  return (
+    <div className="card-hover p-6">
+      <span className="grid size-12 place-items-center rounded-xl" style={{ background: `color-mix(in srgb, ${color} 15%, transparent)`, color }}>
+        <Icon size={22} />
+      </span>
+      <h3 className="mt-4 text-lg font-bold text-ink">{title}</h3>
+      <p className="mt-1.5 text-sm text-ink-soft">{text}</p>
+    </div>
+  )
+}
+
+function Stat({ value, label, color = 'var(--color-brand)' }: { value: string; label: string; color?: string }) {
+  return (
+    <div className="card p-4 text-center">
+      <div className="text-2xl font-extrabold" style={{ color }}>{value}</div>
+      <div className="mt-1 text-xs text-muted">{label}</div>
+    </div>
+  )
+}
+
+const STEPS = [
+  { n: 1, t: 'Создай профиль', d: 'Выбери класс, интересы, предметы и цели за минуту.' },
+  { n: 2, t: 'Получи рекомендации', d: 'Платформа подберёт возможности и курсы под твой профиль.' },
+  { n: 3, t: 'Сохраняй и учись', d: 'Добавляй в избранное, отслеживай дедлайны и проходи уроки.' },
+  { n: 4, t: 'Следи за прогрессом', d: 'Личный кабинет показывает прогресс и ближайшие дедлайны.' },
 ]
 
 export default function Home() {
   const { t, user } = useApp()
-  const [mounted, setMounted] = useState(false)
-
-  useEffect(() => { setMounted(true) }, [])
 
   return (
-    <div style={{ position: 'relative', overflow: 'hidden' }}>
-      <div className="ambient-glow"></div>
-      
+    <div>
       {/* HERO */}
-      <section style={{ padding: '120px 0 80px', minHeight: '90vh', display: 'flex', alignItems: 'center' }}>
-        <div className="container" style={{ position: 'relative', zIndex: 10 }}>
-          <div style={{ maxWidth: '840px', margin: '0 auto', textAlign: 'center', opacity: mounted ? 1 : 0, transition: 'opacity 0.8s ease-out' }}>
-            
-            {/* Badge */}
-            <div className="animate-slide-up" style={{ marginBottom: '32px' }}>
-              <span className="badge" style={{ 
-                background: 'rgba(255,255,255,0.05)', 
-                border: '1px solid rgba(255,255,255,0.1)', 
-                color: 'var(--text-secondary)',
-                padding: '6px 16px',
-                borderRadius: '99px',
-                backdropFilter: 'blur(10px)'
-              }}>
-                <span style={{ color: 'var(--accent)' }}>✦</span> {t('hero.badge')}
-              </span>
-            </div>
-
-            {/* Headline */}
-            <h1 className="animate-slide-up delay-100" style={{ 
-              fontSize: 'clamp(48px, 8vw, 84px)', 
-              fontWeight: '900', 
-              lineHeight: '1.05', 
-              marginBottom: '24px',
-              letterSpacing: '-0.04em'
-            }}>
-              <span style={{ color: '#ffffff' }}>{t('hero.title1')} </span>
-              <span className="gradient-text">{t('hero.title2')} </span>
-              <br />
-              <span style={{ color: 'rgba(255,255,255,0.8)' }}>{t('hero.title3')}</span>
+      <section className="relative overflow-hidden">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 opacity-60"
+          style={{ background: 'radial-gradient(60% 60% at 20% 0%, color-mix(in srgb, var(--color-brand) 22%, transparent), transparent), radial-gradient(50% 50% at 90% 10%, color-mix(in srgb, var(--color-accent) 16%, transparent), transparent)' }}
+        />
+        <div className="section grid items-center gap-10 py-16 lg:grid-cols-2 lg:py-24">
+          <div>
+            <span className="chip border-brand/30 bg-brand/10 text-brand">
+              <Sparkles size={14} /> {t('hero.badge')}
+            </span>
+            <h1 className="mt-4 text-4xl font-extrabold leading-[1.1] text-ink sm:text-5xl">
+              {t('hero.title1')} {t('hero.title2')}<br />{t('hero.title3')}
             </h1>
-
-            {/* Subtitle */}
-            <p className="animate-slide-up delay-200" style={{ 
-              fontSize: '20px', 
-              color: 'var(--text-secondary)', 
-              lineHeight: '1.6', 
-              maxWidth: '640px', 
-              margin: '0 auto 48px',
-              fontWeight: '400'
-            }}>
-              {t('hero.subtitle')}
-            </p>
-
-            {/* CTA buttons */}
-            <div className="animate-slide-up delay-300" style={{ display: 'flex', gap: '16px', justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href="/opportunities" className="btn-primary" style={{ padding: '16px 32px', fontSize: '16px' }}>
-                {t('hero.cta.opportunities')}
+            <p className="mt-4 max-w-xl text-lg text-ink-soft">{t('hero.subtitle')}</p>
+            <div className="mt-7 flex flex-wrap gap-3">
+              <Link href="/opportunities" className="btn-primary text-base !px-5 !py-3">
+                <Search size={18} /> {t('hero.cta.opportunities')}
               </Link>
-              <Link href="/courses" className="btn-secondary" style={{ padding: '16px 32px', fontSize: '16px' }}>
-                {t('hero.cta.courses')}
+              <Link href={user ? '/courses' : '/onboarding'} className="btn-outline text-base !px-5 !py-3">
+                <BookOpen size={18} /> {t('hero.cta.courses')}
               </Link>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* BENTO GRID FEATURES */}
-      <section className="section">
-        <div className="container">
-          <div style={{ textAlign: 'center', marginBottom: '80px' }}>
-            <h2 style={{ fontSize: 'clamp(32px, 5vw, 48px)', fontWeight: '800', marginBottom: '16px', color: '#fff' }}>
-              Designed to <span className="gradient-text">Execute</span>
-            </h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>
-              Не просто витрина. Мы строим пайплайн, который доводит тебя до результата.
-            </p>
+            <div className="mt-8 grid max-w-md grid-cols-3 gap-3">
+              <Stat value="12+" label="возможностей" />
+              <Stat value="3" label="курса с тестами" color="var(--color-accent)" />
+              <Stat value="6" label="направлений" color="#8b5cf6" />
+            </div>
           </div>
 
-          <div className="bento-grid">
-            
-            {/* Feature 1: Large Card */}
-            <div className="bento-item bento-col-8 bento-row-2">
-              <div style={{ position: 'absolute', top: 0, right: 0, width: '300px', height: '300px', background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)', pointerEvents: 'none' }}></div>
-              <h3 style={{ fontSize: '28px', fontWeight: '800', marginBottom: '16px', color: '#fff' }}>Kanban Пайплайн</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '16px', maxWidth: '400px', marginBottom: '32px' }}>
-                Мы знаем, что 35% начатых заявок никогда не отправляются. Наш дашборд превращает сохранённые олимпиады в чёткий трекер задач.
-              </p>
-              
-              <div style={{ display: 'flex', gap: '12px', marginTop: 'auto' }}>
-                {['Интересно', 'Готовлюсь', 'Подал', 'Результат'].map((status, i) => (
-                  <div key={i} style={{
-                    flex: 1, padding: '16px', background: 'rgba(255,255,255,0.03)', 
-                    border: '1px solid rgba(255,255,255,0.08)', borderRadius: '16px'
-                  }}>
-                    <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: i===3?'#4ade80':i===2?'#a855f7':i===1?'#eab308':'#3b82f6', marginBottom: '12px' }}></div>
-                    <div style={{ fontSize: '13px', fontWeight: '600', color: '#fff' }}>{status}</div>
+          {/* Hero mockup card */}
+          <div className="relative">
+            <div className="card fadeup p-5 shadow-2xl">
+              <div className="mb-3 flex items-center justify-between">
+                <p className="text-sm font-bold text-ink">Рекомендовано тебе</p>
+                <span className="badge bg-brand/10 text-brand"><Bot size={12} /> AI</span>
+              </div>
+              {[
+                { t: 'Mentoria AI Hackathon 2026', m: 'Хакатон · STEM', c: 'var(--color-brand)' },
+                { t: 'Английский для академ. успеха', m: 'Курс · 3 урока', c: 'var(--color-accent)' },
+                { t: 'Стипендия Bolashak', m: 'Стипендия · 11 кл.', c: '#8b5cf6' },
+              ].map((x, i) => (
+                <div key={i} className="mb-2 flex items-center gap-3 rounded-xl border border-line p-3">
+                  <span className="size-9 shrink-0 rounded-lg" style={{ background: `color-mix(in srgb, ${x.c} 18%, transparent)` }} />
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold text-ink">{x.t}</p>
+                    <p className="text-xs text-muted">{x.m}</p>
                   </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Feature 2: Small Card */}
-            <div className="bento-item bento-col-4">
-              <div style={{ fontSize: '32px', marginBottom: '16px' }}>📚</div>
-              <h3 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '12px', color: '#fff' }}>Навык → Курс</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-                Нашёл хакатон, но не хватает навыков? Мы сразу рекомендуем нужный мини-курс для подготовки.
-              </p>
-            </div>
-
-            {/* Feature 3: Small Card */}
-            <div className="bento-item bento-col-4">
-              <div style={{ fontSize: '32px', marginBottom: '16px' }}>🗺️</div>
-              <h3 style={{ fontSize: '22px', fontWeight: '800', marginBottom: '12px', color: '#fff' }}>Roadmap 9-12 кл</h3>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '15px' }}>
-                Чёткий чек-лист действий для каждого года обучения, чтобы поступить в топовый университет.
-              </p>
-            </div>
-
-            {/* Feature 4: Wide Card */}
-            <div className="bento-item bento-col-12" style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: '48px' }}>
-              <div style={{ position: 'absolute', top: '-100px', left: '20%', width: '600px', height: '300px', background: 'radial-gradient(ellipse, rgba(0,240,255,0.1) 0%, transparent 60%)', pointerEvents: 'none' }}></div>
-              <div style={{ maxWidth: '500px' }}>
-                <h3 style={{ fontSize: '36px', fontWeight: '900', marginBottom: '16px', color: '#fff' }}>Онбординг за 1 минуту</h3>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '18px' }}>
-                  Скажи нам свой класс и интересы, и мы автоматически соберём ленту релевантных конкурсов.
-                </p>
-              </div>
-              <div className="animate-float d-md-block" style={{ display: 'none', background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '24px', padding: '24px', width: '300px' }}>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  {['Бизнес', 'Программирование', 'IELTS', 'Хакатоны'].map(t => (
-                    <span key={t} style={{ padding: '8px 16px', borderRadius: '99px', background: 'rgba(0,240,255,0.1)', color: 'var(--accent)', border: '1px solid rgba(0,240,255,0.2)', fontSize: '14px', fontWeight: '500' }}>✓ {t}</span>
-                  ))}
+                </div>
+              ))}
+              <div className="mt-3 rounded-xl bg-surface-2 p-3">
+                <div className="mb-1 flex justify-between text-xs text-muted"><span>Прогресс курса</span><span>66%</span></div>
+                <div className="h-2 overflow-hidden rounded-full bg-line">
+                  <div className="h-full rounded-full" style={{ width: '66%', background: 'linear-gradient(90deg, var(--color-brand), var(--color-accent-soft))' }} />
                 </div>
               </div>
             </div>
-
           </div>
         </div>
-        
-        <style>{`
-          @media (min-width: 768px) {
-            .d-md-block { display: block !important; }
-          }
-        `}</style>
       </section>
 
-      {/* CTA SECTION */}
-      <section className="section" style={{ borderTop: '1px solid var(--border)', background: 'linear-gradient(180deg, var(--bg-primary) 0%, #080808 100%)' }}>
-        <div className="container" style={{ textAlign: 'center' }}>
-          <h2 style={{ fontSize: 'clamp(32px, 5vw, 56px)', fontWeight: '900', marginBottom: '24px', color: '#fff', letterSpacing: '-0.02em' }}>
-            Готов начать?
-          </h2>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '20px', marginBottom: '40px' }}>
-            Первая возможность уже ждёт в твоём кабинете.
-          </p>
-          <Link href="/onboarding" className="btn-primary" style={{ padding: '16px 40px', fontSize: '18px' }}>
-            Присоединиться к Mentoria Hub
+      {/* THREE CORE FUNCTIONS */}
+      <section className="section py-12">
+        <div className="grid gap-5 md:grid-cols-3">
+          <FeatureCard icon={Compass} color="var(--color-brand)" title="Находи возможности под свой профиль" text="Каталог олимпиад, хакатонов, стипендий и стажировок с умными фильтрами и сохранением в избранное." />
+          <FeatureCard icon={BookOpen} color="var(--color-accent)" title="Учись в удобном темпе" text="Асинхронные курсы Mentoria с уроками, мини-тестами и прогресс-баром — учись без живых занятий." />
+          <FeatureCard icon={LayoutDashboard} color="#8b5cf6" title="Всё под контролем" text="Личный кабинет с сохранёнными возможностями, прогрессом курсов и ближайшими дедлайнами." />
+        </div>
+      </section>
+
+      {/* HOW IT WORKS */}
+      <section className="section py-12">
+        <h2 className="text-center text-3xl font-extrabold text-ink">Как это работает</h2>
+        <div className="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+          {STEPS.map((s) => (
+            <div key={s.n} className="card relative p-6">
+              <span className="absolute -top-3 left-6 grid size-8 place-items-center rounded-full bg-brand text-sm font-bold text-white">{s.n}</span>
+              <h3 className="mt-3 font-bold text-ink">{s.t}</h3>
+              <p className="mt-1.5 text-sm text-ink-soft">{s.d}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* BONUS FEATURES */}
+      <section className="section py-12">
+        <div className="card overflow-hidden p-8">
+          <h2 className="text-2xl font-extrabold text-ink">Не просто лендинг — настоящий продукт</h2>
+          <p className="mt-2 max-w-2xl text-ink-soft">Mentoria Hub масштабирует организацию за пределы Telegram: единая система возможностей, курсов и аналитики.</p>
+          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              { i: Bot, t: 'AI-ассистент', d: 'Рекомендации по профилю' },
+              { i: CalendarClock, t: 'Календарь дедлайнов', d: 'Ничего не пропустишь' },
+              { i: Award, t: 'Сертификаты', d: 'За завершённые курсы' },
+              { i: Globe, t: '3 языка', d: 'RU · EN · ҚАЗ' },
+              { i: BadgeCheck, t: 'Админ-панель', d: 'Контент без пересборки' },
+              { i: Users, t: 'Лидерборд', d: 'Геймификация обучения' },
+            ].map((x, idx) => (
+              <div key={idx} className="flex items-start gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-brand/10 text-brand"><x.i size={18} /></span>
+                <div>
+                  <p className="font-semibold text-ink">{x.t}</p>
+                  <p className="text-sm text-muted">{x.d}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA */}
+      <section className="section py-12">
+        <div className="card relative overflow-hidden p-10 text-center" style={{ background: 'linear-gradient(135deg, var(--color-brand), var(--color-brand-2))' }}>
+          <h2 className="text-3xl font-extrabold text-white">Готов начать свой путь?</h2>
+          <p className="mx-auto mt-2 max-w-xl text-white/90">Создай профиль и получи персональные рекомендации возможностей и курсов уже сейчас.</p>
+          <Link href="/onboarding" className="btn-accent mx-auto mt-6 text-base !px-6 !py-3">
+            {t('hero.cta.join')} <ArrowRight size={18} />
           </Link>
         </div>
       </section>
-
     </div>
   )
 }

@@ -5,22 +5,10 @@ import { useApp } from '@/lib/context'
 import { supabase } from '@/lib/supabase'
 import Link from 'next/link'
 import { useState } from 'react'
+import { Bookmark, BookmarkCheck, ExternalLink, MapPin, GraduationCap, Clock } from 'lucide-react'
+import { daysLeft, fmtDate, dirColor } from '@/lib/format'
 
 interface Props { opportunity: Opportunity }
-
-const CATEGORY_COLORS: Record<string, string> = {
-  'Олимпиада': 'badge-accent',
-  'Хакатон': 'badge-orange',
-  'Летняя школа': 'badge-green',
-  'Стипендия': 'badge-yellow',
-  'Программа': 'badge-blue',
-}
-
-const FORMAT_ICONS: Record<string, string> = {
-  'Онлайн': '🌐',
-  'Офлайн': '📍',
-  'Гибрид': '🔀',
-}
 
 export default function OpportunityCard({ opportunity: opp }: Props) {
   const { t, user, savedIds, refreshSaved } = useApp()
@@ -29,6 +17,7 @@ export default function OpportunityCard({ opportunity: opp }: Props) {
 
   async function handleSave(e: React.MouseEvent) {
     e.preventDefault()
+    e.stopPropagation()
     if (!user || saving) return
     setSaving(true)
     if (isSaved) {
@@ -40,96 +29,81 @@ export default function OpportunityCard({ opportunity: opp }: Props) {
     setSaving(false)
   }
 
-  const deadline = opp.deadline ? new Date(opp.deadline) : null
-  const daysLeft = deadline ? Math.ceil((deadline.getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null
-  const isUrgent = daysLeft !== null && daysLeft <= 14 && daysLeft >= 0
-  const isPast = daysLeft !== null && daysLeft < 0
+  const d = opp.deadline ? daysLeft(opp.deadline) : null
+  const urgent = d !== null && d <= 7
+  const soon = d !== null && d <= 21
+  const deadlineColor = urgent ? '#dc2626' : soon ? '#f59e0b' : '#16a34a'
+  const dc = dirColor(opp.direction)
 
   return (
-    <Link href={`/opportunities/${opp.id}`} style={{ textDecoration: 'none' }}>
-      <div className="card" style={{ padding: '24px', height: '100%', display: 'flex', flexDirection: 'column', cursor: 'pointer' }}>
-        {/* Top */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', gap: '12px' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-            <span className={`badge ${CATEGORY_COLORS[opp.category] || 'badge-gray'}`}>{opp.category}</span>
-            {opp.format && <span className="badge badge-gray">{FORMAT_ICONS[opp.format] || ''} {opp.format}</span>}
-          </div>
-          {/* Save button */}
-          <button
-            onClick={handleSave}
-            disabled={saving || !user}
-            title={!user ? 'Войдите чтобы сохранить' : (isSaved ? 'Убрать из сохранённых' : 'Сохранить')}
-            style={{
-              width: '32px', height: '32px', borderRadius: '50%',
-              border: `1px solid ${isSaved ? 'var(--accent)' : 'transparent'}`,
-              background: isSaved ? 'var(--accent-glow)' : 'rgba(255,255,255,0.05)',
-              color: isSaved ? 'var(--accent)' : 'var(--text-muted)',
-              cursor: user ? 'pointer' : 'not-allowed',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              transition: 'all 0.2s', flexShrink: 0,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2.5">
-              <path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/>
-            </svg>
-          </button>
-        </div>
-
-        {/* Title */}
-        <h3 className="heading-font" style={{ fontSize: '18px', fontWeight: '700', color: 'var(--text-primary)', marginBottom: '12px', lineHeight: '1.3' }}>
-          {opp.title}
-        </h3>
-
-        {/* Description */}
-        <p style={{ fontSize: '14px', color: 'var(--text-secondary)', lineHeight: '1.6', marginBottom: '16px', flex: 1,
-          display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {opp.description}
-        </p>
-
-        {/* Direction */}
-        {opp.direction && (
-          <div style={{ marginBottom: '12px' }}>
-            <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>📌 {opp.direction}</span>
-          </div>
-        )}
-
-        {/* Grade levels */}
-        {opp.grade_level?.length > 0 && (
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginBottom: '12px' }}>
-            {opp.grade_level.map(g => (
-              <span key={g} className="badge badge-gray" style={{ fontSize: '11px', padding: '2px 8px' }}>{g} кл</span>
-            ))}
-          </div>
-        )}
-
-        <hr className="divider" style={{ margin: '12px 0' }} />
-
-        {/* Bottom: deadline + apply */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px' }}>
-          {deadline ? (
-            <div>
-              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginBottom: '2px' }}>{t('opp.deadline')}</div>
-              <div style={{ fontSize: '13px', fontWeight: '600', color: isPast ? 'var(--text-muted)' : isUrgent ? '#f87171' : '#4ade80' }}>
-                {isPast ? 'Истёк' : deadline.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short', year: 'numeric' })}
-                {!isPast && daysLeft !== null && <span style={{ fontSize: '11px', fontWeight: '400', marginLeft: '6px' }}>({daysLeft}д)</span>}
-              </div>
-            </div>
-          ) : <div/>}
-
-          {opp.apply_url && (
-            <a
-              href={opp.apply_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={e => e.stopPropagation()}
-              className="btn-primary btn-sm"
-              style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
-            >
-              {t('opp.apply')} ↗
-            </a>
+    <article className="card-hover fadeup flex flex-col p-5">
+      {/* Top: badges + save */}
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="badge bg-surface-2 text-ink-soft">{opp.category}</span>
+          {opp.direction && (
+            <span className="badge" style={{ color: dc, background: `color-mix(in srgb, ${dc} 14%, transparent)` }}>
+              {opp.direction}
+            </span>
           )}
         </div>
+        <button
+          onClick={handleSave}
+          disabled={saving || !user}
+          aria-label={isSaved ? t('opp.saved') : t('opp.save')}
+          className={`grid size-9 shrink-0 place-items-center rounded-lg border transition-colors cursor-pointer ${
+            isSaved ? 'border-brand bg-brand/10 text-brand' : 'border-line text-muted hover:text-brand'
+          }`}
+        >
+          {isSaved ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
+        </button>
       </div>
-    </Link>
+
+      {/* Title + description */}
+      <h3 className="text-base font-bold leading-snug text-ink">{opp.title}</h3>
+      <p className="mt-2 line-clamp-2 text-sm text-ink-soft">{opp.description}</p>
+
+      {/* Meta */}
+      <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-muted">
+        {opp.grade_level?.length > 0 && (
+          <span className="inline-flex items-center gap-1">
+            <GraduationCap size={14} /> {opp.grade_level.join(', ')} кл.
+          </span>
+        )}
+        {opp.format && (
+          <span className="inline-flex items-center gap-1">
+            <MapPin size={14} /> {opp.format}
+          </span>
+        )}
+      </div>
+
+      {/* Footer: deadline + apply */}
+      <div className="mt-4 flex items-center justify-between border-t border-line pt-3">
+        <div className="flex items-center gap-2">
+          {d !== null && (
+            <span
+              className="badge"
+              title={fmtDate(opp.deadline)}
+              style={{ color: deadlineColor, background: `color-mix(in srgb, ${deadlineColor} 14%, transparent)` }}
+            >
+              <Clock size={12} />
+              {d > 0 ? `${d} дн.` : 'завершён'}
+            </span>
+          )}
+          {opp.deadline && <span className="text-xs text-muted">{fmtDate(opp.deadline)}</span>}
+        </div>
+        {opp.apply_url && (
+          <a
+            href={opp.apply_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="btn-primary !px-3 !py-2 text-xs"
+          >
+            {t('opp.apply')} <ExternalLink size={14} />
+          </a>
+        )}
+      </div>
+    </article>
   )
 }

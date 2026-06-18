@@ -2,59 +2,32 @@
 
 import { useApp } from '@/lib/context'
 import Link from 'next/link'
+import { Map, CheckCircle2 } from 'lucide-react'
 
-const ROADMAP_DATA = [
+const ROADMAP = [
   {
-    grade: '9 класс',
-    title: 'Исследование и База',
-    color: '#3b82f6',
-    desc: 'Время пробовать разное, подтягивать английский и математику. Оценки уже идут в транскрипт.',
-    actions: [
-      'Пройти курс "Основы математики"',
-      'Сдать первый пробный IELTS/Duolingo',
-      'Участвовать в школьных олимпиадах для опыта',
-      'Начать волонтёрский проект',
-    ],
-    oppTypes: ['Летняя школа', 'Олимпиада (начальный уровень)'],
+    grade: 9,
+    color: '#0ea5e9',
+    title: 'Фундамент и интересы',
+    items: ['Пройти базовые курсы по любимым предметам', 'Участвовать в школьных олимпиадах', 'Попробовать разные направления (STEM, бизнес, наука)'],
   },
   {
-    grade: '10 класс',
-    title: 'Фокус и Достижения',
-    color: '#eab308',
-    desc: 'Выбор направления (STEM, Бизнес, Гуманитарные). Участие в крупных конкурсах. Подготовка к SAT.',
-    actions: [
-      'Пройти курс "Подготовка к SAT/IELTS"',
-      'Участвовать в республиканских олимпиадах/хакатонах',
-      'Найти ментора или присоединиться к клубу',
-      'Начать подготовку портфолио',
-    ],
-    oppTypes: ['Хакатон', 'Республиканская олимпиада'],
+    grade: 10,
+    color: '#f59e0b',
+    title: 'Углубление и опыт',
+    items: ['Выбрать 2–3 приоритетных направления', 'Хакатоны, исследовательские программы, волонтёрство', 'Подготовка к SAT/IELTS'],
   },
   {
-    grade: '11 класс',
-    title: 'Тесты и Лидерство',
-    color: '#f97316',
-    desc: 'Пик активности. Сдача всех тестов, капитанство в клубах, международные программы.',
-    actions: [
-      'Сдать IELTS (7.0+) и SAT',
-      'Подать на международные летние программы (YYGS, MIT Mites)',
-      'Написать черновик Personal Statement',
-      'Организовать свой проект/мероприятие',
-    ],
-    oppTypes: ['Международная программа', 'Лидерская программа'],
+    grade: 11,
+    color: '#8b5cf6',
+    title: 'Тесты и лидерство',
+    items: ['Сдать IELTS (7.0+) и SAT', 'Международные летние программы', 'Написать черновик Personal Statement'],
   },
   {
-    grade: '12 класс / Gap Year',
-    title: 'Заявки и Поступление',
-    color: '#22c55e',
-    desc: 'Только работа над эссе, финансовой помощью и отправка заявок. Никаких новых крупных проектов.',
-    actions: [
-      'Пройти курс "Английский для академического успеха" (эссе)',
-      'Сформировать список из 10-15 вузов',
-      'Подать на стипендии (Болашак, NU, гранты)',
-      'Отправить заявки (Early Action / Regular Decision)',
-    ],
-    oppTypes: ['Стипендия', 'Грант'],
+    grade: 12,
+    color: '#16a34a',
+    title: 'Заявки и поступление',
+    items: ['Сформировать список из 10-15 вузов', 'Подать на стипендии (Болашак, NU, гранты)', 'Отправить заявки (Early Action / Regular Decision)'],
   },
 ]
 
@@ -62,77 +35,46 @@ export default function RoadmapPage() {
   const { t } = useApp()
 
   return (
-    <div className="section">
-      <div className="container">
-        <div style={{ textAlign: 'center', marginBottom: '60px' }}>
-          <span className="badge badge-accent" style={{ marginBottom: '12px' }}>🗺️ Путь</span>
-          <h1 style={{ fontSize: 'clamp(28px,4vw,44px)', fontWeight: '800', marginBottom: '16px' }}>{t('roadmap.title')}</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '18px', maxWidth: '600px', margin: '0 auto' }}>{t('roadmap.subtitle')}</p>
+    <div className="section py-10">
+      <div className="mb-8 flex items-center gap-3">
+        <span className="grid size-11 place-items-center rounded-xl bg-brand/10 text-brand"><Map size={22} /></span>
+        <div>
+          <h1 className="text-3xl font-extrabold text-ink">{t('roadmap.title')}</h1>
+          <p className="text-sm text-muted">{t('roadmap.subtitle')}</p>
         </div>
-
-        <div style={{ position: 'relative', maxWidth: '800px', margin: '0 auto' }}>
-          {/* Vertical line */}
-          <div style={{ position: 'absolute', left: '24px', top: '24px', bottom: '24px', width: '2px', background: 'var(--border)' }} className="timeline-line"/>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '48px' }}>
-            {ROADMAP_DATA.map((item, idx) => (
-              <div key={idx} style={{ position: 'relative', paddingLeft: '64px' }}>
-                {/* Dot */}
-                <div style={{
-                  position: 'absolute', left: '16px', top: '24px',
-                  width: '18px', height: '18px', borderRadius: '50%',
-                  background: item.color, border: '4px solid var(--bg-primary)',
-                  boxShadow: `0 0 10px ${item.color}80`
-                }}/>
-                
-                <div className="card" style={{ padding: '32px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px', marginBottom: '16px' }}>
-                    <div>
-                      <div style={{ fontSize: '14px', fontWeight: '700', color: item.color, marginBottom: '4px' }}>{item.grade}</div>
-                      <h2 style={{ fontSize: '22px', fontWeight: '800' }}>{item.title}</h2>
-                    </div>
-                  </div>
-                  
-                  <p style={{ color: 'var(--text-secondary)', fontSize: '15px', lineHeight: '1.6', marginBottom: '24px' }}>
-                    {item.desc}
-                  </p>
-
-                  <div style={{ background: 'var(--bg-secondary)', borderRadius: '12px', padding: '20px', marginBottom: '24px' }}>
-                    <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '12px' }}>КЛЮЧЕВЫЕ ДЕЙСТВИЯ:</h3>
-                    <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                      {item.actions.map((act, i) => (
-                        <li key={i} style={{ fontSize: '14px', display: 'flex', gap: '8px' }}>
-                          <span style={{ color: 'var(--accent)' }}>•</span> {act}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-
-                  <div>
-                    <h3 style={{ fontSize: '13px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '12px' }}>ИСКАТЬ В КАТАЛОГЕ:</h3>
-                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                      {item.oppTypes.map((type, i) => (
-                        <Link key={i} href={`/opportunities?category=${type.split(' ')[0]}`} className="badge badge-gray" style={{ textDecoration: 'none', cursor: 'pointer' }}>
-                          {type} ↗
-                        </Link>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
       </div>
 
-      <style>{`
-        @media (max-width: 600px) {
-          .timeline-line { display: none; }
-          div[style*="paddingLeft: '64px'"] { padding-left: 0 !important; }
-          div[style*="position: 'absolute', left: '16px'"] { display: none; }
-        }
-      `}</style>
+      <div className="relative space-y-6 before:absolute before:left-[19px] before:top-2 before:h-full before:w-0.5 before:bg-line sm:before:left-1/2">
+        {ROADMAP.map((stage, i) => (
+          <div key={stage.grade} className={`relative sm:grid sm:grid-cols-2 sm:gap-8 ${i % 2 ? 'sm:[&>*:first-child]:col-start-2' : ''}`}>
+            <div className={`relative pl-12 sm:pl-0 ${i % 2 ? '' : 'sm:text-right'}`}>
+              <span
+                className="absolute left-2 top-1 z-10 grid size-9 place-items-center rounded-full text-sm font-bold text-white ring-4 ring-bg sm:left-1/2 sm:-translate-x-1/2"
+                style={{ background: stage.color }}
+              >
+                {stage.grade}
+              </span>
+              <div className="card-hover p-5">
+                <div className={`mb-2 flex items-center gap-2 ${i % 2 ? '' : 'sm:justify-end'}`}>
+                  <span className="badge" style={{ color: stage.color, background: `color-mix(in srgb, ${stage.color} 14%, transparent)` }}>{stage.grade} класс</span>
+                </div>
+                <h3 className="text-lg font-bold text-ink">{stage.title}</h3>
+                <ul className="mt-2 space-y-1.5 text-sm text-ink-soft">
+                  {stage.items.map((it) => (
+                    <li key={it} className="flex items-start gap-2">
+                      <CheckCircle2 size={15} className="mt-0.5 shrink-0 text-accent" /> <span>{it}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-10 text-center">
+        <Link href="/opportunities" className="btn-primary">Подобрать возможности для моего этапа</Link>
+      </div>
     </div>
   )
 }

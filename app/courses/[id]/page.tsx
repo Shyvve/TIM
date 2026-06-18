@@ -6,6 +6,26 @@ import { supabase } from '@/lib/supabase'
 import { Course, Lesson } from '@/types'
 import { useApp } from '@/lib/context'
 import Link from 'next/link'
+import { ArrowLeft, CheckCircle2, Circle, Play, ExternalLink, Lock } from 'lucide-react'
+
+function RichContent({ text }: { text: string }) {
+  const parts = text.split(/(\[.*?\]\(.*?\)|\*\*.*?\*\*|\n)/g)
+  return (
+    <div className="space-y-2 text-sm leading-relaxed text-ink-soft">
+      {text.split('\n').map((line, i) => {
+        if (!line.trim()) return <br key={i} />
+        const rendered = line.replace(
+          /\[([^\]]+)\]\((https?:\/\/[^\)]+)\)/g,
+          '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-brand hover:underline font-medium">$1 ↗</a>'
+        ).replace(
+          /\*\*([^*]+)\*\*/g,
+          '<strong class="text-ink font-semibold">$1</strong>'
+        )
+        return <p key={i} dangerouslySetInnerHTML={{ __html: rendered }} />
+      })}
+    </div>
+  )
+}
 
 export default function CourseDetailPage() {
   const { id } = useParams()
@@ -14,24 +34,21 @@ export default function CourseDetailPage() {
   const [lessons, setLessons] = useState<Lesson[]>([])
   const [progress, setProgress] = useState<Record<string, boolean>>({})
   const [loading, setLoading] = useState(true)
-  const [activeLesson, setActiveLesson] = useState<Lesson | null>(null)
+  const [active, setActive] = useState(0)
   const [testAnswers, setTestAnswers] = useState<Record<string, number>>({})
-  const [testResult, setTestResult] = useState<Record<string, boolean>>({})
+  const [testChecked, setTestChecked] = useState<Record<string, boolean>>({})
   const [completing, setCompleting] = useState(false)
 
-  useEffect(() => { if (id) fetchCourseAndLessons() }, [id])
+  useEffect(() => { if (id) fetchData() }, [id])
   useEffect(() => { if (user && lessons.length) fetchProgress() }, [user, lessons])
 
-  async function fetchCourseAndLessons() {
+  async function fetchData() {
     setLoading(true)
     const { data: c } = await supabase.from('courses').select('*').eq('id', id).single()
     if (c) {
       setCourse(c)
       const { data: l } = await supabase.from('lessons').select('*').eq('course_id', c.id).order('order_num')
-      if (l) {
-        setLessons(l)
-        if (l.length > 0) setActiveLesson(l[0])
-      }
+      if (l) setLessons(l)
     }
     setLoading(false)
   }
@@ -44,242 +61,180 @@ export default function CourseDetailPage() {
       .eq('user_id', user.id)
       .in('lesson_id', lessons.map(l => l.id))
       .eq('completed', true)
-    
     if (data) {
       const p: Record<string, boolean> = {}
-      data.forEach((item: any) => p[item.lesson_id] = item.completed)
+      data.forEach((item: any) => p[item.lesson_id] = true)
       setProgress(p)
     }
   }
 
   async function completeLesson() {
-    if (!user || !activeLesson || completing) return
-    
-    // Check if test passed (if test exists)
-    if (activeLesson.mini_test && activeLesson.mini_test.length > 0) {
-      const isPassed = activeLesson.mini_test.every((q, i) => testAnswers[`${activeLesson.id}_${i}`] === q.correct)
-      if (!isPassed) {
-        setTestResult({ ...testResult, [activeLesson.id]: false })
-        return
-      }
-      setTestResult({ ...testResult, [activeLesson.id]: true })
+    if (!user || !lesson || completing) return
+    const quiz = lesson.mini_test
+    if (quiz?.length) {
+      const allCorrect = quiz.every((q, i) => testAnswers[`${lesson.id}_${i}`] === q.correct)
+      setTestChecked({ ...testChecked, [lesson.id]: allCorrect })
+      if (!allCorrect) return
     }
-
     setCompleting(true)
     await supabase.from('course_progress').upsert({
-      user_id: user.id,
-      lesson_id: activeLesson.id,
-      completed: true,
-      completed_at: new Date().toISOString()
+      user_id: user.id, lesson_id: lesson.id, completed: true, completed_at: new Date().toISOString()
     })
-    
-    setProgress({ ...progress, [activeLesson.id]: true })
+    setProgress({ ...progress, [lesson.id]: true })
     setCompleting(false)
   }
 
-  if (loading) return (
-    <div className="section container">
-      <div className="skeleton" style={{ height: '400px', borderRadius: '16px' }}/>
-    </div>
-  )
-
+  if (loading) return <div className="section py-10"><div className="skeleton" style={{ height: '400px' }} /></div>
   if (!course) return (
-    <div className="section container empty-state">
-      <h2>Курс не найден</h2>
-      <Link href="/courses" className="btn-secondary" style={{ marginTop: '16px', display:'inline-flex' }}>← К списку курсов</Link>
+    <div className="section py-20 text-center">
+      <p className="text-ink-soft">Курс не найден.</p>
+      <Link href="/courses" className="btn-primary mt-4">К курсам</Link>
     </div>
   )
 
+  const lesson = lessons[active]
   const completedCount = Object.keys(progress).length
-  const totalCount = lessons.length
-  const pct = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0
+  const pct = lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0
+  const lessonDone = lesson ? progress[lesson.id] : false
 
   return (
-    <div className="section">
-      <div className="container">
-        <Link href="/courses" className="btn-ghost" style={{ marginBottom: '24px', display: 'inline-flex' }}>
-          ← {t('common.back')}
-        </Link>
+    <div className="section py-8">
+      <Link href="/courses" className="btn-ghost mb-4 text-sm"><ArrowLeft size={16} /> Все курсы</Link>
 
-        {/* Course Header */}
-        <div className="card" style={{ padding: '32px', marginBottom: '32px' }}>
-          <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '16px' }}>
-            <span className="badge badge-accent">{course.level}</span>
-            {course.skill_tags?.map(t => <span key={t} className="tag">#{t}</span>)}
+      {/* Header */}
+      <div className="card overflow-hidden">
+        <div className="p-6" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--color-brand) 16%, transparent), transparent)' }}>
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="badge bg-brand/10 text-brand">{course.level}</span>
+            {course.skill_tags?.map(tag => <span key={tag} className="badge bg-surface-2 text-ink-soft">#{tag}</span>)}
           </div>
-          <h1 style={{ fontSize: 'clamp(24px,3vw,36px)', fontWeight: '800', marginBottom: '12px' }}>{course.title}</h1>
-          <p style={{ color: 'var(--text-secondary)', fontSize: '16px', marginBottom: '24px' }}>{course.description}</p>
-          
-          {user ? (
-            <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '13px', marginBottom: '8px' }}>
-                <span style={{ color: 'var(--text-muted)' }}>Прогресс: {completedCount} из {totalCount} уроков</span>
-                <span style={{ fontWeight: '600', color: pct === 100 ? '#4ade80' : 'var(--text-primary)' }}>{pct}%</span>
-              </div>
-              <div className="progress-bar">
-                <div className="progress-fill" style={{ width: `${pct}%`, background: pct === 100 ? '#4ade80' : 'var(--gradient-accent)' }}/>
-              </div>
+          <h1 className="text-2xl font-extrabold text-ink sm:text-3xl">{course.title}</h1>
+          <p className="mt-2 max-w-2xl text-ink-soft">{course.description}</p>
+          <div className="mt-5">
+            <div className="mb-1 flex justify-between text-sm">
+              <span className="font-semibold text-ink">Прогресс: {completedCount} из {lessons.length}</span>
+              <span className="text-muted">{pct}%</span>
             </div>
-          ) : (
-            <div className="info-box">
-              <span style={{ fontSize: '20px' }}>💡</span>
-              <p style={{ fontSize: '14px', color: 'var(--text-secondary)' }}>
-                Чтобы сохранять прогресс по курсу, <Link href="/onboarding" style={{ color: 'var(--accent-light)' }}>создайте профиль</Link>.
-              </p>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-surface-2">
+              <div className="bar-fill h-full rounded-full" style={{ width: `${pct}%`, background: pct === 100 ? '#16a34a' : 'linear-gradient(90deg, var(--color-brand), var(--color-accent-soft))' }} />
             </div>
-          )}
-        </div>
-
-        {/* Layout: Sidebar + Content */}
-        <div style={{ display: 'grid', gridTemplateColumns: '300px 1fr', gap: '32px' }}>
-          
-          {/* Lessons list */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <h3 style={{ fontSize: '15px', fontWeight: '700', color: 'var(--text-muted)', marginBottom: '8px' }}>ПРОГРАММА</h3>
-            {lessons.map((lesson, idx) => {
-              const isDone = progress[lesson.id]
-              const isActive = activeLesson?.id === lesson.id
-              return (
-                <button
-                  key={lesson.id}
-                  onClick={() => setActiveLesson(lesson)}
-                  style={{
-                    padding: '16px',
-                    background: isActive ? 'var(--bg-card)' : 'transparent',
-                    border: `1px solid ${isActive ? 'var(--accent)' : 'var(--border)'}`,
-                    borderRadius: '12px',
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '12px',
-                    color: isActive ? 'var(--text-primary)' : 'var(--text-secondary)',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  <div style={{
-                    width: '28px', height: '28px', borderRadius: '50%',
-                    background: isDone ? 'rgba(34,197,94,0.15)' : 'var(--bg-secondary)',
-                    border: `1px solid ${isDone ? 'rgba(34,197,94,0.4)' : 'var(--border)'}`,
-                    color: isDone ? '#4ade80' : 'var(--text-muted)',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: '13px', fontWeight: '600',
-                  }}>
-                    {isDone ? '✓' : idx + 1}
-                  </div>
-                  <div style={{ fontWeight: isActive ? '600' : '500', fontSize: '14px', flex: 1 }}>{lesson.title}</div>
-                </button>
-              )
-            })}
           </div>
-
-          {/* Lesson content */}
-          {activeLesson && (
-            <div>
-              <div className="card" style={{ padding: '32px', marginBottom: '24px' }}>
-                <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '20px' }}>{activeLesson.title}</h2>
-                
-                {/* Video placeholder */}
-                {activeLesson.video_placeholder && (
-                  <div style={{
-                    width: '100%', aspectRatio: '16/9',
-                    background: 'var(--bg-secondary)',
-                    border: '1px solid var(--border)',
-                    borderRadius: '12px',
-                    marginBottom: '24px',
-                    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
-                    color: 'var(--text-muted)',
-                  }}>
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ marginBottom: '12px' }}>
-                      <circle cx="12" cy="12" r="10"/><path d="m10 8 6 4-6 4V8z"/>
-                    </svg>
-                    <span>Видеоурок ({activeLesson.video_placeholder})</span>
-                  </div>
-                )}
-
-                {/* Content text */}
-                <div style={{ color: 'var(--text-secondary)', lineHeight: '1.8', whiteSpace: 'pre-line', fontSize: '15px' }}>
-                  {activeLesson.content}
-                </div>
-              </div>
-
-              {/* Mini test */}
-              {activeLesson.mini_test && activeLesson.mini_test.length > 0 && (
-                <div className="card" style={{ padding: '32px', marginBottom: '24px', border: '1px solid rgba(108,99,255,0.3)', background: 'rgba(108,99,255,0.05)' }}>
-                  <h3 style={{ fontSize: '18px', fontWeight: '700', marginBottom: '20px', color: 'var(--accent-light)' }}>
-                    📝 Проверь себя
-                  </h3>
-                  
-                  {testResult[activeLesson.id] === false && (
-                    <div style={{ padding: '12px', background: 'rgba(239,68,68,0.1)', color: '#f87171', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>
-                      Ответы неверны. Попробуй ещё раз.
-                    </div>
-                  )}
-                  {testResult[activeLesson.id] === true && (
-                    <div style={{ padding: '12px', background: 'rgba(34,197,94,0.1)', color: '#4ade80', borderRadius: '8px', marginBottom: '16px', fontSize: '14px' }}>
-                      Всё верно! Урок пройден.
-                    </div>
-                  )}
-
-                  {activeLesson.mini_test.map((q, qIdx) => (
-                    <div key={qIdx} style={{ marginBottom: '24px' }}>
-                      <p style={{ fontWeight: '600', marginBottom: '12px', fontSize: '15px' }}>{q.question}</p>
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                        {q.options.map((opt, oIdx) => {
-                          const isSelected = testAnswers[`${activeLesson.id}_${qIdx}`] === oIdx
-                          const isDoneAndCorrect = testResult[activeLesson.id] && q.correct === oIdx
-                          
-                          return (
-                            <button
-                              key={oIdx}
-                              disabled={testResult[activeLesson.id]}
-                              onClick={() => setTestAnswers({...testAnswers, [`${activeLesson.id}_${qIdx}`]: oIdx})}
-                              style={{
-                                padding: '12px 16px',
-                                background: isDoneAndCorrect ? 'rgba(34,197,94,0.15)' : isSelected ? 'rgba(108,99,255,0.15)' : 'var(--bg-secondary)',
-                                border: `1px solid ${isDoneAndCorrect ? '#4ade80' : isSelected ? 'var(--accent)' : 'var(--border)'}`,
-                                borderRadius: '10px',
-                                textAlign: 'left',
-                                color: isDoneAndCorrect ? '#4ade80' : isSelected ? 'var(--accent-light)' : 'var(--text-secondary)',
-                                cursor: testResult[activeLesson.id] ? 'default' : 'pointer',
-                                transition: 'all 0.2s',
-                              }}
-                            >
-                              {opt}
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* Complete button */}
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  className="btn-primary"
-                  onClick={completeLesson}
-                  disabled={!user || completing || progress[activeLesson.id] || (testResult[activeLesson.id] === true)}
-                  style={{
-                    opacity: (!user || progress[activeLesson.id]) ? 0.5 : 1,
-                    cursor: (!user || progress[activeLesson.id]) ? 'not-allowed' : 'pointer'
-                  }}
-                >
-                  {progress[activeLesson.id] ? '✓ Урок завершён' : 'Завершить урок'}
-                </button>
-              </div>
-
-            </div>
-          )}
         </div>
       </div>
 
-      <style>{`
-        @media (max-width: 800px) {
-          .container > div:last-child { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
+      <div className="mt-6 grid gap-6 lg:grid-cols-[320px_1fr]">
+        {/* Lesson list */}
+        <aside className="card h-fit p-3">
+          <p className="px-2 py-2 text-sm font-bold text-ink">Уроки курса</p>
+          {lessons.map((l, i) => {
+            const done = progress[l.id]
+            return (
+              <button
+                key={l.id}
+                onClick={() => setActive(i)}
+                className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors cursor-pointer ${
+                  i === active ? 'bg-brand/10' : 'hover:bg-surface-2'
+                }`}
+              >
+                {done ? <CheckCircle2 size={18} className="text-accent shrink-0" /> : <Circle size={18} className="text-muted shrink-0" />}
+                <span className="min-w-0 flex-1">
+                  <span className={`block truncate text-sm font-semibold ${i === active ? 'text-brand' : 'text-ink'}`}>{l.title}</span>
+                </span>
+              </button>
+            )
+          })}
+        </aside>
+
+        {/* Lesson content */}
+        {lesson && (
+          <section className="card p-6">
+            <div className="mb-3 flex items-center gap-2 text-sm text-muted">
+              <span>Урок {active + 1} из {lessons.length}</span>
+            </div>
+            <h2 className="text-xl font-bold text-ink">{lesson.title}</h2>
+
+            {/* Video — clickable link to resource */}
+            {lesson.video_placeholder && (
+              <a
+                href={lesson.video_placeholder}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-4 flex aspect-video w-full items-center justify-center gap-3 rounded-xl border border-line bg-surface-2 transition-all hover:border-brand hover:bg-brand/5 group cursor-pointer"
+              >
+                <div className="text-center">
+                  <div className="mx-auto grid size-16 place-items-center rounded-full bg-brand/15 text-brand transition-transform group-hover:scale-110">
+                    <Play size={28} className="ml-1" />
+                  </div>
+                  <p className="mt-3 text-sm font-semibold text-ink">Открыть видео-ресурс</p>
+                  <p className="mt-1 flex items-center justify-center gap-1 text-xs text-muted">
+                    {lesson.video_placeholder.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]}
+                    <ExternalLink size={10} />
+                  </p>
+                </div>
+              </a>
+            )}
+
+            {/* Rich content with clickable links */}
+            <div className="mt-6">
+              <RichContent text={lesson.content} />
+            </div>
+
+            {/* Mini test */}
+            {lesson.mini_test?.length > 0 && (
+              <div className="mt-6 rounded-xl border border-brand/30 bg-brand/5 p-5">
+                <p className="mb-4 text-sm font-bold text-ink">Мини-тест</p>
+                {lesson.mini_test.map((q, qIdx) => (
+                  <div key={qIdx} className="mb-4">
+                    <p className="mb-3 text-sm font-semibold text-ink">{q.question}</p>
+                    <div className="space-y-2">
+                      {q.options.map((opt, oIdx) => {
+                        const key = `${lesson.id}_${qIdx}`
+                        const picked = testAnswers[key] === oIdx
+                        const checked = testChecked[lesson.id] !== undefined
+                        const isCorrect = q.correct === oIdx
+                        const state = checked
+                          ? isCorrect ? 'border-accent bg-accent/10 text-ink' : picked ? 'border-red-400 bg-red-500/10 text-ink' : 'border-line text-ink-soft'
+                          : picked ? 'border-brand bg-brand/10 text-ink' : 'border-line text-ink-soft hover:border-brand'
+                        return (
+                          <button
+                            key={oIdx}
+                            disabled={lessonDone}
+                            onClick={() => { setTestAnswers({ ...testAnswers, [key]: oIdx }); setTestChecked(prev => { const n = { ...prev }; delete n[lesson.id]; return n }) }}
+                            className={`flex w-full items-center gap-2 rounded-xl border px-3 py-2.5 text-left text-sm transition-colors cursor-pointer ${state}`}
+                          >
+                            <span className="grid size-5 place-items-center rounded-full border border-current text-[11px]">{String.fromCharCode(65 + oIdx)}</span>
+                            {opt}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ))}
+                {testChecked[lesson.id] === false && <p className="text-sm font-semibold text-red-500">Неверно, попробуй ещё</p>}
+                {testChecked[lesson.id] === true && <p className="text-sm font-semibold text-accent">Верно! Урок засчитан ✓</p>}
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="mt-5 flex justify-between">
+              <button onClick={() => setActive(a => Math.max(0, a - 1))} disabled={active === 0} className="btn-outline text-sm">
+                <ArrowLeft size={16} /> Назад
+              </button>
+              {lessonDone ? (
+                active < lessons.length - 1 ? (
+                  <button onClick={() => setActive(a => a + 1)} className="btn-primary text-sm">Следующий урок</button>
+                ) : (
+                  <span className="btn-accent text-sm">Курс завершён ✓</span>
+                )
+              ) : (
+                <button onClick={completeLesson} disabled={!user || completing} className="btn-primary text-sm">
+                  {completing ? 'Сохранение...' : 'Завершить урок'}
+                </button>
+              )}
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   )
 }

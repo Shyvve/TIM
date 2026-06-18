@@ -4,164 +4,134 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/context'
+import { ArrowRight, ArrowLeft, Check, GraduationCap } from 'lucide-react'
+import { DIRECTIONS } from '@/lib/format'
 
 const GRADES = ['9', '10', '11', '12']
-const INTERESTS = ['Программирование', 'Бизнес', 'Математика', 'Английский', 'Робототехника', 'Биология', 'Медицина', 'Дизайн', 'Волонтерство']
+const GOALS = ['Поступление в университет', 'Победа в олимпиаде', 'Портфолио и опыт', 'Стипендия/грант', 'Новые навыки']
+
+function MultiPick({ options, value, onChange }: { options: string[]; value: string[]; onChange: (v: string[]) => void }) {
+  const toggle = (o: string) => onChange(value.includes(o) ? value.filter((x) => x !== o) : [...value, o])
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map((o) => (
+        <button key={o} onClick={() => toggle(o)} className={value.includes(o) ? 'chip-on' : 'chip'}>
+          {value.includes(o) && <Check size={13} />} {o}
+        </button>
+      ))}
+    </div>
+  )
+}
 
 export default function OnboardingPage() {
   const { t, user, setUser, sessionId } = useApp()
   const router = useRouter()
-  const [step, setStep] = useState(1)
-  
-  const [grade, setGrade] = useState('')
-  const [interests, setInterests] = useState<string[]>([])
-  const [goal, setGoal] = useState('')
+  const [step, setStep] = useState(0)
+  const [form, setForm] = useState({ grade: '', interests: [] as string[], goal: '' })
   const [saving, setSaving] = useState(false)
 
-  const toggleInterest = (i: string) => {
-    if (interests.includes(i)) setInterests(interests.filter(x => x !== i))
-    else setInterests([...interests, i])
-  }
+  const steps = [
+    {
+      title: t('onboard.title'),
+      body: (
+        <div className="space-y-5">
+          <div>
+            <label className="label">{t('onboard.grade')}</label>
+            <div className="flex gap-2">
+              {GRADES.map((g) => (
+                <button key={g} onClick={() => setForm({ ...form, grade: g })} className={form.grade === g ? 'chip-on' : 'chip'}>
+                  {g} класс
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ),
+      valid: form.grade.length > 0,
+    },
+    {
+      title: t('onboard.interests'),
+      hint: 'Выбери направления — по ним подберём возможности.',
+      body: <MultiPick options={DIRECTIONS} value={form.interests} onChange={(v) => setForm({ ...form, interests: v })} />,
+      valid: form.interests.length > 0,
+    },
+    {
+      title: t('onboard.goal'),
+      hint: 'Ради чего ты ищешь возможности? Какая у тебя мечта?',
+      body: (
+        <div className="space-y-4">
+          <MultiPick options={GOALS} value={form.goal ? [form.goal] : []} onChange={(v) => setForm({ ...form, goal: v[v.length - 1] || '' })} />
+          <textarea
+            className="input min-h-20"
+            placeholder={t('onboard.goal.placeholder')}
+            value={form.goal}
+            onChange={(e) => setForm({ ...form, goal: e.target.value })}
+          />
+        </div>
+      ),
+      valid: form.goal.length > 0,
+    },
+  ]
 
-  async function handleFinish() {
+  const cur = steps[step]
+
+  async function finish() {
     setSaving(true)
-    let finalUser = user
-
     if (!user) {
-      // Create new user based on session ID
       const { data } = await supabase.from('users').insert({
         session_id: sessionId,
-        grade,
-        interests,
-        goal,
+        grade: form.grade,
+        interests: form.interests,
+        goal: form.goal,
         onboarding_done: true
       }).select().single()
-      if (data) {
-        setUser(data)
-        finalUser = data
-      }
+      if (data) setUser(data)
     } else {
-      // Update existing user
       const { data } = await supabase.from('users').update({
-        grade,
-        interests,
-        goal,
+        grade: form.grade,
+        interests: form.interests,
+        goal: form.goal,
         onboarding_done: true
       }).eq('id', user.id).select().single()
-      if (data) {
-        setUser(data)
-        finalUser = data
-      }
+      if (data) setUser(data)
     }
-    
     setSaving(false)
     router.push('/dashboard')
   }
 
   return (
-    <div className="section" style={{ minHeight: 'calc(100vh - 64px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <div className="container" style={{ maxWidth: '600px', width: '100%' }}>
-        
-        {/* Progress */}
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '32px' }}>
-          {[1,2,3].map(s => (
-            <div key={s} style={{
-              flex: 1, height: '4px', borderRadius: '2px',
-              background: s <= step ? 'var(--accent)' : 'var(--border)'
-            }}/>
-          ))}
+    <div className="section max-w-2xl py-12">
+      <div className="mb-6 flex items-center gap-3">
+        <span className="grid size-11 place-items-center rounded-xl bg-brand/10 text-brand"><GraduationCap size={22} /></span>
+        <div>
+          <h1 className="text-2xl font-extrabold text-ink">Создание профиля</h1>
+          <p className="text-sm text-muted">Шаг {step + 1} из {steps.length}</p>
         </div>
+      </div>
 
-        <div className="card" style={{ padding: '40px', textAlign: 'center' }}>
-          {step === 1 && (
-            <div className="animate-fade-in">
-              <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>👋</span>
-              <h1 style={{ fontSize: '28px', fontWeight: '800', marginBottom: '12px' }}>{t('onboard.title')}</h1>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>{t('onboard.subtitle')}</p>
-              
-              <div style={{ textAlign: 'left', marginBottom: '32px' }}>
-                <label className="label">{t('onboard.grade')}</label>
-                <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-                  {GRADES.map(g => (
-                    <button
-                      key={g}
-                      onClick={() => setGrade(g)}
-                      style={{
-                        flex: 1,
-                        padding: '16px',
-                        borderRadius: '12px',
-                        background: grade === g ? 'rgba(108,99,255,0.15)' : 'var(--bg-secondary)',
-                        border: `1px solid ${grade === g ? 'var(--accent)' : 'var(--border)'}`,
-                        color: grade === g ? 'var(--accent-light)' : 'var(--text-primary)',
-                        fontSize: '18px', fontWeight: '600',
-                        cursor: 'pointer', transition: 'all 0.2s'
-                      }}
-                    >
-                      {g} класс
-                    </button>
-                  ))}
-                </div>
-              </div>
+      <div className="mb-6 h-2 overflow-hidden rounded-full bg-surface-2">
+        <div className="h-full rounded-full bg-brand transition-all duration-300" style={{ width: `${((step + 1) / steps.length) * 100}%` }} />
+      </div>
 
-              <button className="btn-primary" style={{ width: '100%', justifyContent: 'center' }} disabled={!grade} onClick={() => setStep(2)}>
-                {t('onboard.next')} →
-              </button>
-            </div>
-          )}
+      <div className="card p-7">
+        <h2 className="text-xl font-bold text-ink">{cur.title}</h2>
+        {'hint' in cur && cur.hint && <p className="mb-4 mt-1 text-sm text-muted">{cur.hint}</p>}
+        <div className="mt-4">{cur.body}</div>
+      </div>
 
-          {step === 2 && (
-            <div className="animate-fade-in">
-              <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🎯</span>
-              <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '12px' }}>{t('onboard.interests')}</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Выбери то, что тебе нравится. Мы подберём релевантные хакатоны и олимпиады.</p>
-              
-              <div className="checkbox-grid" style={{ justifyContent: 'center', marginBottom: '32px' }}>
-                {INTERESTS.map(i => (
-                  <button
-                    key={i}
-                    onClick={() => toggleInterest(i)}
-                    className={`checkbox-chip ${interests.includes(i) ? 'selected' : ''}`}
-                  >
-                    {interests.includes(i) ? '✓ ' : '+ '}{i}
-                  </button>
-                ))}
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="btn-secondary" onClick={() => setStep(1)}>←</button>
-                <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={interests.length === 0} onClick={() => setStep(3)}>
-                  {t('onboard.next')} →
-                </button>
-              </div>
-            </div>
-          )}
-
-          {step === 3 && (
-            <div className="animate-fade-in">
-              <span style={{ fontSize: '48px', display: 'block', marginBottom: '16px' }}>🚀</span>
-              <h2 style={{ fontSize: '24px', fontWeight: '800', marginBottom: '12px' }}>{t('onboard.goal')}</h2>
-              <p style={{ color: 'var(--text-secondary)', marginBottom: '32px' }}>Ради чего ты ищешь возможности? Какая у тебя мечта?</p>
-              
-              <div style={{ textAlign: 'left', marginBottom: '32px' }}>
-                <textarea
-                  className="input"
-                  style={{ minHeight: '120px' }}
-                  placeholder={t('onboard.goal.placeholder')}
-                  value={goal}
-                  onChange={e => setGoal(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', gap: '12px' }}>
-                <button className="btn-secondary" onClick={() => setStep(2)}>←</button>
-                <button className="btn-primary" style={{ flex: 1, justifyContent: 'center' }} disabled={!goal || saving} onClick={handleFinish}>
-                  {saving ? 'Сохранение...' : t('onboard.finish')}
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-        
+      <div className="mt-6 flex items-center justify-between">
+        <button onClick={() => setStep((s) => Math.max(0, s - 1))} disabled={step === 0} className="btn-ghost">
+          <ArrowLeft size={16} /> Назад
+        </button>
+        {step < steps.length - 1 ? (
+          <button onClick={() => setStep((s) => s + 1)} disabled={!cur.valid} className="btn-primary">
+            Далее <ArrowRight size={16} />
+          </button>
+        ) : (
+          <button onClick={finish} disabled={!cur.valid || saving} className="btn-accent">
+            <Check size={16} /> {saving ? 'Сохранение...' : 'Готово — в кабинет'}
+          </button>
+        )}
       </div>
     </div>
   )

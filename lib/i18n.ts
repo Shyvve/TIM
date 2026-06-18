@@ -11,6 +11,7 @@ export const translations: Translations = {
   'nav.dashboard': { ru: 'Кабинет', kz: 'Кабинет', en: 'Dashboard' },
   'nav.roadmap': { ru: 'Roadmap', kz: 'Roadmap', en: 'Roadmap' },
   'nav.admin': { ru: 'Админ', kz: 'Әкімші', en: 'Admin' },
+  'nav.knowledge': { ru: 'База знаний', kz: 'Білім базасы', en: 'Knowledge Base' },
   // Hero
   'hero.badge': { ru: 'Платформа для школьников ЦА', kz: 'ОА мектеп оқушыларына арналған платформа', en: 'Platform for Central Asian Students' },
   'hero.title1': { ru: 'Найти возможность', kz: 'Мүмкіндік табу', en: 'Finding opportunities' },
