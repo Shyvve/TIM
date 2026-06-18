@@ -203,6 +203,8 @@ export default function Assistant() {
     } finally { setLoading(false) }
   }
 
+  if (!user) return null
+
   return (
     <>
       <button onClick={() => setOpen(o => !o)} className="btn-primary fixed bottom-5 right-5 z-50 !rounded-full !px-4 !py-3 shadow-2xl" aria-label="AI">

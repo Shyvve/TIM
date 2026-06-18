@@ -8,7 +8,7 @@ const supabase = createClient(
 )
 
 export async function POST(req: NextRequest) {
-  const { username, password, phone } = await req.json()
+  const { username, password, phone, code, token } = await req.json()
 
   if (!username || !password || !phone) {
     return NextResponse.json({ error: 'Заполни все поля' }, { status: 400 })
@@ -19,8 +19,21 @@ export async function POST(req: NextRequest) {
   if (password.length < 6) {
     return NextResponse.json({ error: 'Пароль мин. 6 символов' }, { status: 400 })
   }
-  if (phone.replace(/\D/g, '').length < 10) {
-    return NextResponse.json({ error: 'Неверный номер телефона' }, { status: 400 })
+
+  // Verify TG code if provided
+  if (code && token) {
+    const { data: vc } = await supabase
+      .from('verification_codes')
+      .select('*')
+      .eq('token', token)
+      .eq('code', code)
+      .eq('used', false)
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle()
+    if (!vc) {
+      return NextResponse.json({ error: 'Неверный или просроченный код' }, { status: 400 })
+    }
+    await supabase.from('verification_codes').update({ used: true }).eq('id', vc.id)
   }
 
   const { data: byName } = await supabase.from('users').select('id').eq('username', username).maybeSingle()
