@@ -10,7 +10,7 @@ import React from 'react'
 const MAX_MESSAGES = 20
 const WINDOW_MS = 4 * 60 * 60 * 1000
 const MAX_INPUT = 500
-const ADMIN_PW = 'mentoria2025'
+const ADMIN_PW_HASH = '533cfdb1f790424acd40168584a751052baeb627a79dd53f68058ae48bf5e7be'
 
 const SYSTEM_PROMPT = `Ты — AI-ассистент платформы Mentoria Hub. Ты помогаешь школьникам 8–12 классов из Центральной Азии с поступлением в топовые университеты мира.
 
@@ -156,7 +156,10 @@ export default function Assistant() {
     if (!text || loading) return
 
     if (adminMode) {
-      if (text === ADMIN_PW) { await resetLimit(); setInput(''); return }
+      const data = new TextEncoder().encode(text)
+      const hash = await crypto.subtle.digest('SHA-256', data)
+      const hex = Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('')
+      if (hex === ADMIN_PW_HASH) { await resetLimit(); setInput(''); return }
       setMessages(prev => [...prev, { role: 'assistant', content: 'Неверный пароль.' }])
       setAdminMode(false); setInput(''); return
     }
