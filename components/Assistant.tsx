@@ -1,10 +1,15 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Sparkles, X, Send } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Sparkles, X, Send, AlertTriangle } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useApp } from '@/lib/context'
 import { daysLeft, fmtDate } from '@/lib/format'
+
+const MAX_MESSAGES_PER_WINDOW = 20
+const WINDOW_MS = 4 * 60 * 60 * 1000 // 4 часа
+const MAX_INPUT_LENGTH = 500
+const ADMIN_PASSWORD = 'mentoria2025'
 
 const SYSTEM_PROMPT = `Ты — AI-ассистент платформы Mentoria Hub. Ты помогаешь школьникам 8–12 классов из Центральной Азии (Казахстан, Узбекистан, Кыргызстан и т.д.) с поступлением в топовые университеты мира.
 
@@ -63,11 +68,80 @@ const SYSTEM_PROMPT = `Ты — AI-ассистент платформы Mentori
 6. Мотивируй, но будь честным — не обещай 100% поступление.
 7. Отвечай кратко (3-5 предложений), если не просят подробнее.
 8. Если вопрос не по теме образования — вежливо верни к теме.
-9. Упоминай разделы сайта: /knowledge (база знаний), /opportunities (возможности), /courses (курсы), /roadmap.`
+9. Упоминай разделы сайта: /knowledge (база знаний), /opportunities (возможности), /courses (курсы), /roadmap.
+10. Ссылки оформляй так: название (url) — чтобы пользователь мог кликнуть.
+11. ЭКОНОМЬ токены: не повторяй вопрос пользователя, не пиши длинные вступления. Сразу давай ответ.
+12. Если пользователь просит написать что-то бессмысленное много раз, генерировать код, писать эссе за него или что-то не по теме — вежливо откажи и верни к теме поступления.
+13. НЕ пиши больше 5-7 предложений без прямой просьбы "подробнее" или "расскажи больше".`
 
 interface Message {
   role: 'user' | 'assistant'
   content: string
+}
+
+interface RateLimitState {
+  timestamps: number[]
+}
+
+function getRateLimit(): RateLimitState {
+  try {
+    const raw = localStorage.getItem('mh_chat_rl')
+    if (raw) return JSON.parse(raw)
+  } catch {}
+  return { timestamps: [] }
+}
+
+function saveRateLimit(state: RateLimitState) {
+  localStorage.setItem('mh_chat_rl', JSON.stringify(state))
+}
+
+function resetRateLimit() {
+  localStorage.removeItem('mh_chat_rl')
+}
+
+function checkRateLimit(): { ok: boolean; remaining: number; resetIn: string } {
+  const state = getRateLimit()
+  const now = Date.now()
+  const valid = state.timestamps.filter(t => now - t < WINDOW_MS)
+  const remaining = MAX_MESSAGES_PER_WINDOW - valid.length
+  if (remaining <= 0) {
+    const oldest = Math.min(...valid)
+    const resetMs = WINDOW_MS - (now - oldest)
+    const mins = Math.ceil(resetMs / 60000)
+    return { ok: false, remaining: 0, resetIn: `${Math.floor(mins / 60)}ч ${mins % 60}м` }
+  }
+  return { ok: true, remaining, resetIn: '' }
+}
+
+function recordMessage() {
+  const state = getRateLimit()
+  const now = Date.now()
+  state.timestamps = [...state.timestamps.filter(t => now - t < WINDOW_MS), now]
+  saveRateLimit(state)
+}
+
+function renderMessage(text: string) {
+  const lines = text.split('\n')
+  return lines.map((line, i) => {
+    const parts: (string | React.ReactElement)[] = []
+    const urlRegex = /(https?:\/\/[^\s\)]+)/g
+    let lastIndex = 0
+    let match
+    while ((match = urlRegex.exec(line)) !== null) {
+      if (match.index > lastIndex) parts.push(line.slice(lastIndex, match.index))
+      const url = match[1]
+      const domain = url.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]
+      parts.push(
+        <a key={`${i}-${match.index}`} href={url} target="_blank" rel="noopener noreferrer" className="text-brand underline hover:text-brand-2 break-all">
+          {domain} ↗
+        </a>
+      )
+      lastIndex = match.index + match[0].length
+    }
+    if (lastIndex < line.length) parts.push(line.slice(lastIndex))
+    if (parts.length === 0 && line.trim() === '') return <br key={i} />
+    return <p key={i} className="mb-1">{parts}</p>
+  })
 }
 
 export default function Assistant() {
@@ -75,10 +149,12 @@ export default function Assistant() {
   const [open, setOpen] = useState(false)
   const [input, setInput] = useState('')
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'assistant', content: 'Привет! Я AI-ассистент Mentoria Hub. Знаю всё про IELTS, SAT, поступление, стипендии и текущие хакатоны/олимпиады на нашей платформе. Спрашивай!' },
+    { role: 'assistant', content: 'Привет! Я AI-ассистент Mentoria Hub.\n\nЗнаю всё про IELTS, SAT, поступление, стипендии и текущие хакатоны на платформе. Спрашивай!' },
   ])
   const [loading, setLoading] = useState(false)
   const [siteContext, setSiteContext] = useState('')
+  const [limitHit, setLimitHit] = useState(false)
+  const [adminInput, setAdminInput] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -86,8 +162,8 @@ export default function Assistant() {
   }, [messages])
 
   useEffect(() => {
-    fetchSiteContext()
-  }, [user])
+    if (open) fetchSiteContext()
+  }, [open, user])
 
   async function fetchSiteContext() {
     const { data: opps } = await supabase
@@ -126,10 +202,45 @@ export default function Assistant() {
     setSiteContext(ctx)
   }
 
+  function handleAdminUnlock(password: string) {
+    if (password === ADMIN_PASSWORD) {
+      resetRateLimit()
+      setLimitHit(false)
+      setAdminInput(false)
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Лимит сброшен. Можешь продолжать!' }])
+    } else {
+      setMessages(prev => [...prev, { role: 'assistant', content: 'Неверный пароль.' }])
+      setAdminInput(false)
+    }
+  }
+
   async function send(preset?: string) {
     const text = (preset ?? input).trim()
     if (!text || loading) return
+
+    if (text.length > MAX_INPUT_LENGTH) {
+      setMessages(prev => [...prev, { role: 'user', content: text.slice(0, 50) + '...' }, { role: 'assistant', content: `⚠️ Сообщение слишком длинное (макс. ${MAX_INPUT_LENGTH} символов). Сформулируй короче.` }])
+      setInput('')
+      return
+    }
+
+    const limit = checkRateLimit()
+    if (!limit.ok) {
+      setLimitHit(true)
+      setMessages(prev => [...prev, { role: 'user', content: text }, { role: 'assistant', content: `⚠️ Лимит сообщений (${MAX_MESSAGES_PER_WINDOW} за 4 часа) исчерпан. Обновление через ${limit.resetIn}.\n\nЕсли у тебя есть пароль администратора — напиши его чтобы сбросить лимит.` }])
+      setInput('')
+      setAdminInput(true)
+      return
+    }
+
+    if (adminInput) {
+      handleAdminUnlock(text)
+      setInput('')
+      return
+    }
+
     setInput('')
+    recordMessage()
 
     const userMsg: Message = { role: 'user', content: text }
     const newMessages = [...messages, userMsg]
@@ -138,7 +249,6 @@ export default function Assistant() {
 
     try {
       const fullPrompt = SYSTEM_PROMPT + siteContext
-
       const res = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -156,11 +266,13 @@ export default function Assistant() {
       const data = await res.json()
       setMessages([...newMessages, { role: 'assistant', content: data.content }])
     } catch (e: any) {
-      setMessages([...newMessages, { role: 'assistant', content: `⚠️ ${e.message || 'Не удалось получить ответ. Попробуй позже.'}` }])
+      setMessages([...newMessages, { role: 'assistant', content: `⚠️ ${e.message || 'Не удалось получить ответ.'}` }])
     } finally {
       setLoading(false)
     }
   }
+
+  const limit = checkRateLimit()
 
   return (
     <>
@@ -174,26 +286,27 @@ export default function Assistant() {
       </button>
 
       {open && (
-        <div className="fadeup fixed bottom-20 right-5 z-50 flex h-[28rem] w-[min(92vw,22rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
+        <div className="fadeup fixed bottom-20 right-5 z-50 flex h-[32rem] w-[min(92vw,24rem)] flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-2xl">
           <div className="flex items-center gap-2 border-b border-line bg-surface-2 px-4 py-3">
             <span className="grid size-8 place-items-center rounded-lg bg-brand/15 text-brand">
               <Sparkles size={16} />
             </span>
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-bold text-ink">AI-ассистент</p>
               <p className="text-[11px] text-muted">Эксперт по поступлению</p>
             </div>
+            <span className="text-[10px] text-muted">{limit.remaining}/{MAX_MESSAGES_PER_WINDOW}</span>
           </div>
 
           <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto p-3">
             {messages.map((m, i) => (
               <div key={i} className={m.role === 'user' ? 'text-right' : ''}>
                 <div
-                  className={`inline-block max-w-[85%] rounded-2xl px-3 py-2 text-sm whitespace-pre-line ${
+                  className={`inline-block max-w-[85%] rounded-2xl px-3 py-2 text-sm ${
                     m.role === 'user' ? 'bg-brand text-white' : 'bg-surface-2 text-ink'
                   }`}
                 >
-                  {m.content}
+                  {m.role === 'assistant' ? renderMessage(m.content) : m.content}
                 </div>
               </div>
             ))}
@@ -207,20 +320,24 @@ export default function Assistant() {
           </div>
 
           <div className="border-t border-line p-2">
-            <div className="mb-2 flex flex-wrap gap-1.5">
-              {['Ближайший хакатон?', 'SAT vs ACT', 'Стипендии need-blind', 'IELTS 7.0 план'].map((p) => (
-                <button key={p} onClick={() => send(p)} className="chip !py-0.5 text-[11px]">
-                  {p}
-                </button>
-              ))}
-            </div>
+            {!limitHit && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {['Ближайший хакатон?', 'SAT vs ACT', 'Need-blind вузы', 'IELTS план'].map((p) => (
+                  <button key={p} onClick={() => send(p)} className="chip !py-0.5 text-[11px]">
+                    {p}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex items-center gap-2">
               <input
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => setInput(e.target.value.slice(0, MAX_INPUT_LENGTH))}
                 onKeyDown={(e) => e.key === 'Enter' && send()}
-                placeholder="Спроси про поступление…"
+                placeholder={adminInput ? 'Пароль администратора...' : 'Спроси про поступление…'}
+                type={adminInput ? 'password' : 'text'}
                 className="input !py-2"
+                maxLength={MAX_INPUT_LENGTH}
               />
               <button onClick={() => send()} disabled={loading} className="btn-primary !px-3 !py-2" aria-label="Отправить">
                 <Send size={16} />
