@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Library, ExternalLink, Search, BookOpen, GraduationCap, FileText, Users, Briefcase, Link2, MessageSquare, Award, Map, Download } from 'lucide-react'
 import { useApp } from '@/lib/context'
-import { materialsForSection } from '@/lib/materials'
+import { materialsForSection, groupMaterials, DRIVE_FOLDER } from '@/lib/materials'
 
 const TABS = [
   { id: 'ielts', label: 'IELTS', icon: BookOpen },
@@ -240,6 +240,7 @@ export default function KnowledgePage() {
   const materials = materialsForSection(activeTab).filter(m =>
     !search || `${m.name} ${m.desc}`.toLowerCase().includes(search.toLowerCase())
   )
+  const materialGroups = groupMaterials(materials)
 
   return (
     <div className="section py-10">
@@ -288,31 +289,41 @@ export default function KnowledgePage() {
         />
       </div>
 
-      {/* Скачиваемые материалы (PDF/DOCX) */}
+      {/* Скачиваемые материалы (PDF/DOCX), сгруппированные по подкатегориям */}
       {materials.length > 0 && (
-        <div className="mb-6">
-          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand">
-            <Download size={14} /> Материалы для скачивания
-          </h3>
-          <div className="space-y-2">
-            {materials.map(m => (
-              <div key={m.file} className="card p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-ink">{m.name}</span>
-                      <span className="badge bg-surface-2 text-muted">{m.format} · {m.size}</span>
-                      <span className="badge border-accent/20 bg-accent/10 text-accent" style={{ borderWidth: '1px' }}>бесплатно</span>
-                    </div>
-                    <p className="mt-1 text-sm text-ink-soft">{m.desc}</p>
-                  </div>
-                  <a href={`/materials/${m.file}`} download className="btn-primary !px-3 !py-1.5 text-xs shrink-0">
-                    Скачать <Download size={12} />
-                  </a>
-                </div>
-              </div>
-            ))}
+        <div className="mb-8">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h3 className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand">
+              <Download size={14} /> Материалы для скачивания
+            </h3>
+            <a href={DRIVE_FOLDER} target="_blank" rel="noopener noreferrer" className="btn-outline !px-3 !py-1.5 text-xs">
+              Полная подборка (книги и тесты) на Google Drive <ExternalLink size={12} />
+            </a>
           </div>
+          {materialGroups.map(g => (
+            <div key={g.group} className="mb-5">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-muted">{g.group}</p>
+              <div className="space-y-2">
+                {g.items.map(m => (
+                  <div key={m.file} className="card p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-ink">{m.name}</span>
+                          <span className="badge bg-surface-2 text-muted">{m.format} · {m.size}</span>
+                          <span className="badge border-accent/20 bg-accent/10 text-accent" style={{ borderWidth: '1px' }}>бесплатно</span>
+                        </div>
+                        <p className="mt-1 text-sm text-ink-soft">{m.desc}</p>
+                      </div>
+                      <a href={`/materials/${m.file}`} download className="btn-primary !px-3 !py-1.5 text-xs shrink-0">
+                        Скачать <Download size={12} />
+                      </a>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
 
