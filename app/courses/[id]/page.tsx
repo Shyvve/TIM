@@ -6,7 +6,8 @@ import { supabase } from '@/lib/supabase'
 import { Course, Lesson } from '@/types'
 import { useApp } from '@/lib/context'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle2, Circle, Play, ExternalLink, Lock } from 'lucide-react'
+import { ArrowLeft, CheckCircle2, Circle, Play, ExternalLink, Lock, Download } from 'lucide-react'
+import { materialsForCourse } from '@/lib/materials'
 
 function RichContent({ text }: { text: string }) {
   const parts = text.split(/(\[.*?\]\(.*?\)|\*\*.*?\*\*|\n)/g)
@@ -96,6 +97,7 @@ export default function CourseDetailPage() {
   const completedCount = Object.keys(progress).length
   const pct = lessons.length > 0 ? Math.round((completedCount / lessons.length) * 100) : 0
   const lessonDone = lesson ? progress[lesson.id] : false
+  const materials = materialsForCourse(course.skill_tags)
 
   return (
     <div className="section py-8">
@@ -235,6 +237,36 @@ export default function CourseDetailPage() {
           </section>
         )}
       </div>
+
+      {/* Материалы курса (PDF/DOCX для скачивания) */}
+      {materials.length > 0 && (
+        <div className="card mt-6 p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <span className="grid size-9 place-items-center rounded-xl bg-brand/10 text-brand"><Download size={18} /></span>
+            <div>
+              <h2 className="text-lg font-bold text-ink">Материалы курса</h2>
+              <p className="text-xs text-muted">Бесплатные PDF и шаблоны для скачивания</p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {materials.map(m => (
+              <a
+                key={m.file}
+                href={`/materials/${m.file}`}
+                download
+                className="flex items-center gap-3 rounded-xl border border-line p-3 transition-colors hover:border-brand hover:bg-brand/5"
+              >
+                <span className="grid size-10 shrink-0 place-items-center rounded-lg bg-surface-2 text-xs font-bold text-brand">{m.format}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink">{m.name}</span>
+                  <span className="block truncate text-xs text-muted">{m.desc}</span>
+                </span>
+                <span className="flex shrink-0 items-center gap-1 text-xs text-muted">{m.size} <Download size={14} /></span>
+              </a>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

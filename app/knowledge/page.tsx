@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { Library, ExternalLink, Search, BookOpen, GraduationCap, FileText, Users, Briefcase, Link2, MessageSquare, Award, Map } from 'lucide-react'
+import { Library, ExternalLink, Search, BookOpen, GraduationCap, FileText, Users, Briefcase, Link2, MessageSquare, Award, Map, Download } from 'lucide-react'
 import { useApp } from '@/lib/context'
+import { materialsForSection } from '@/lib/materials'
 
 const TABS = [
   { id: 'ielts', label: 'IELTS', icon: BookOpen },
@@ -236,6 +237,10 @@ export default function KnowledgePage() {
     )
   })).filter(sub => sub.items.length > 0)
 
+  const materials = materialsForSection(activeTab).filter(m =>
+    !search || `${m.name} ${m.desc}`.toLowerCase().includes(search.toLowerCase())
+  )
+
   return (
     <div className="section py-10">
       {/* Header */}
@@ -283,6 +288,34 @@ export default function KnowledgePage() {
         />
       </div>
 
+      {/* Скачиваемые материалы (PDF/DOCX) */}
+      {materials.length > 0 && (
+        <div className="mb-6">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-brand">
+            <Download size={14} /> Материалы для скачивания
+          </h3>
+          <div className="space-y-2">
+            {materials.map(m => (
+              <div key={m.file} className="card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-semibold text-ink">{m.name}</span>
+                      <span className="badge bg-surface-2 text-muted">{m.format} · {m.size}</span>
+                      <span className="badge border-accent/20 bg-accent/10 text-accent" style={{ borderWidth: '1px' }}>бесплатно</span>
+                    </div>
+                    <p className="mt-1 text-sm text-ink-soft">{m.desc}</p>
+                  </div>
+                  <a href={`/materials/${m.file}`} download className="btn-primary !px-3 !py-1.5 text-xs shrink-0">
+                    Скачать <Download size={12} />
+                  </a>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Content */}
       {filteredSubs.map(sub => (
         <div key={sub.title} className="mb-6">
@@ -321,7 +354,7 @@ export default function KnowledgePage() {
         </div>
       ))}
 
-      {filteredSubs.length === 0 && (
+      {filteredSubs.length === 0 && materials.length === 0 && (
         <div className="card flex flex-col items-center gap-2 p-10 text-center">
           <Search className="text-muted" size={32} />
           <p className="font-semibold text-ink">Ничего не найдено</p>
